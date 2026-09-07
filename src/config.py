@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_format: str = "json"
 
+    # ===== 存储（v0.1.1 A1）=====
+    storage_provider: Literal["memory", "sqlite"] = "sqlite"
+    data_dir: str = "data"
+
     # ===== 管理员 =====
     admin_email: str = "admin@example.com"
     admin_password: str = "ChangeMe@2026"

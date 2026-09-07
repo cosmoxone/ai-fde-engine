@@ -25,19 +25,15 @@ from .config import get_settings
 from .evaluation.evaluator import Evaluator
 from .memory import get_memory_manager
 from .pipeline.iteration import NightlyIterationPipeline
+from .storage import get_storage
 from .tools.benchmark import BenchmarkTool
 from .tools.doc_parser import DocParserTool
 
 settings = get_settings()
 
-# 内存存储（MVP，生产环境用PostgreSQL）
-_projects: dict[str, dict] = {}
-_tasks: dict[str, dict] = {}
-_documents: dict[str, list[dict]] = {}
-_benchmarks: dict[str, dict] = {}
+# 业务数据持久化：storage 扩展点（默认 SQLite 单文件 data/aifde.db，v0.1.1 A1）
+# 运行时 Agent 实例保持内存态（重建成本低，不参与持久化）
 _self_service_agents: dict[str, SelfServiceAgent] = {}
-_review_queue: list[dict] = []
-_feedback_store: dict[str, list[dict]] = {}
 
 
 def _add_to_review_queue(project_id: str, review_type: str, result: Any = None, requires_approval: bool = True):
@@ -56,8 +52,7 @@ def _add_to_review_queue(project_id: str, review_type: str, result: Any = None, 
         "result": result.to_dict() if hasattr(result, "to_dict") else result,
         "requires_approval": requires_approval,
     }
-    _review_queue.append(review_item)
-    return review_item
+    return get_storage().add_review(review_item)
 
 
 @asynccontextmanager
@@ -204,8 +199,8 @@ async def health_check():
         "version": "0.1.0",
         "app_name": settings.app_name,
         "env": settings.app_env,
-        "active_projects": len(_projects),
-        "active_tasks": sum(1 for t in _tasks.values() if t.get("status") == "running"),
+        "active_projects": len(get_storage().list_projects()),
+        "active_tasks": get_storage().count_running_tasks(),
         "services": {
             "postgresql": "healthy" if settings.postgres_host else "mock",
             "qdrant": "healthy" if settings.qdrant_host else "mock",
@@ -230,8 +225,7 @@ async def create_project(req: ProjectCreate):
         "created_at": __import__("time").time(),
         "config": {},
     }
-    _projects[project_id] = project
-    _documents[project_id] = []
+    get_storage().create_project(project)
     # 初始化记忆
     memory = get_memory_manager(project_id)
     await memory.remember(
@@ -245,20 +239,21 @@ async def create_project(req: ProjectCreate):
 @app.get("/api/v1/projects")
 async def list_projects():
     """项目列表"""
-    return {"success": True, "projects": list(_projects.values()), "total": len(_projects)}
+    projects = get_storage().list_projects()
+    return {"success": True, "projects": projects, "total": len(projects)}
 
 
 @app.get("/api/v1/projects/{project_id}")
 async def get_project(project_id: str):
     """项目详情"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
-    project = _projects[project_id]
+    project = get_storage().get_project(project_id)
     memory = get_memory_manager(project_id)
     return {
         "success": True,
         "project": project,
-        "documents_count": len(_documents.get(project_id, [])),
+        "documents_count": len(get_storage().list_documents(project_id)),
         "memory_stats": memory.get_stats(),
     }
 
@@ -267,7 +262,7 @@ async def get_project(project_id: str):
 @app.post("/api/v1/projects/{project_id}/documents")
 async def upload_document(project_id: str, file: UploadFile = File(...)):
     """上传文档"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     # 保存文件
@@ -294,7 +289,7 @@ async def upload_document(project_id: str, file: UploadFile = File(...)):
         "page_count": parse_result.get("page_count", 0),
         "uploaded_at": __import__("time").time(),
     }
-    _documents[project_id].append(doc_record)
+    get_storage().add_document(project_id, doc_record)
 
     # 记录到记忆
     memory = get_memory_manager(project_id)
@@ -309,7 +304,7 @@ async def upload_document(project_id: str, file: UploadFile = File(...)):
 @app.get("/api/v1/projects/{project_id}/documents")
 async def list_documents(project_id: str):
     """文档列表"""
-    docs = _documents.get(project_id, [])
+    docs = get_storage().list_documents(project_id)
     return {"success": True, "documents": docs, "total": len(docs)}
 
 
@@ -317,22 +312,24 @@ async def list_documents(project_id: str):
 @app.post("/api/v1/projects/{project_id}/research/run")
 async def run_research(project_id: str, req: ResearchRun, background_tasks: BackgroundTasks):
     """触发调研分析"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {
-        "id": task_id,
-        "project_id": project_id,
-        "type": "research",
-        "status": "running",
-        "created_at": __import__("time").time(),
-    }
+    get_storage().create_task(
+        {
+            "id": task_id,
+            "project_id": project_id,
+            "type": "research",
+            "status": "running",
+            "created_at": __import__("time").time(),
+        }
+    )
 
     async def do_research():
         try:
             agent = ResearchAgent(project_id)
-            docs = _documents.get(project_id, [])
+            docs = get_storage().list_documents(project_id)
             result = await agent.execute(
                 {
                     "documents": docs,
@@ -340,15 +337,14 @@ async def run_research(project_id: str, req: ResearchRun, background_tasks: Back
                     "interview_notes": req.interview_notes,
                 }
             )
-            _tasks[task_id]["status"] = "completed"
-            _tasks[task_id]["result"] = result.to_dict()
-            _projects[project_id]["requirements_baseline"] = result.structured_output
-            _projects[project_id]["status"] = "design"
+            get_storage().update_task(task_id, {"status": "completed", "result": result.to_dict()})
+            get_storage().update_project(
+                project_id, {"requirements_baseline": result.structured_output, "status": "design"}
+            )
             # 后台完成后自动入审核队列，等待人工确认
             _add_to_review_queue(project_id, "research_result", result, requires_approval=True)
         except Exception as e:
-            _tasks[task_id]["status"] = "failed"
-            _tasks[task_id]["error"] = str(e)
+            get_storage().update_task(task_id, {"status": "failed", "error": str(e)})
 
     background_tasks.add_task(do_research)
     return {"success": True, "task_id": task_id, "message": "调研分析已启动"}
@@ -358,22 +354,26 @@ async def run_research(project_id: str, req: ResearchRun, background_tasks: Back
 @app.post("/api/v1/projects/{project_id}/design/run")
 async def run_design(project_id: str, req: DesignRun, background_tasks: BackgroundTasks):
     """触发方案设计"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {
-        "id": task_id,
-        "project_id": project_id,
-        "type": "design",
-        "status": "running",
-        "created_at": __import__("time").time(),
-    }
+    get_storage().create_task(
+        {
+            "id": task_id,
+            "project_id": project_id,
+            "type": "design",
+            "status": "running",
+            "created_at": __import__("time").time(),
+        }
+    )
 
     async def do_design():
         try:
             agent = DesignAgent(project_id)
-            baseline = req.requirements_baseline or _projects[project_id].get("requirements_baseline", {})
+            baseline = req.requirements_baseline or (get_storage().get_project(project_id) or {}).get(
+                "requirements_baseline", {}
+            )
             result = await agent.execute(
                 {
                     "requirements_baseline": baseline,
@@ -382,15 +382,12 @@ async def run_design(project_id: str, req: DesignRun, background_tasks: Backgrou
                     "benchmark": baseline.get("benchmark", {}),
                 }
             )
-            _tasks[task_id]["status"] = "completed"
-            _tasks[task_id]["result"] = result.to_dict()
-            _projects[project_id]["solutions"] = result.structured_output
-            _projects[project_id]["status"] = "iteration"
+            get_storage().update_task(task_id, {"status": "completed", "result": result.to_dict()})
+            get_storage().update_project(project_id, {"solutions": result.structured_output, "status": "iteration"})
             # 后台完成后自动入审核队列
             _add_to_review_queue(project_id, "design_solution", result, requires_approval=True)
         except Exception as e:
-            _tasks[task_id]["status"] = "failed"
-            _tasks[task_id]["error"] = str(e)
+            get_storage().update_task(task_id, {"status": "failed", "error": str(e)})
 
     background_tasks.add_task(do_design)
     return {"success": True, "task_id": task_id, "message": "方案设计已启动"}
@@ -400,17 +397,19 @@ async def run_design(project_id: str, req: DesignRun, background_tasks: Backgrou
 @app.post("/api/v1/projects/{project_id}/delivery/run")
 async def run_delivery(project_id: str, req: DeliveryRun, background_tasks: BackgroundTasks):
     """触发开发交付任务"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {
-        "id": task_id,
-        "project_id": project_id,
-        "type": f"delivery_{req.task_type}",
-        "status": "running",
-        "created_at": __import__("time").time(),
-    }
+    get_storage().create_task(
+        {
+            "id": task_id,
+            "project_id": project_id,
+            "type": f"delivery_{req.task_type}",
+            "status": "running",
+            "created_at": __import__("time").time(),
+        }
+    )
 
     async def do_delivery():
         try:
@@ -419,24 +418,22 @@ async def run_delivery(project_id: str, req: DeliveryRun, background_tasks: Back
                 {
                     "task_type": req.task_type,
                     "tech_solution": req.tech_solution
-                    or _projects[project_id].get("solutions", {}).get("tech_solution", {}),
+                    or (get_storage().get_project(project_id) or {}).get("solutions", {}).get("tech_solution", {}),
                     "requirements": req.requirements
-                    or _projects[project_id]
+                    or (get_storage().get_project(project_id) or {})
                     .get("requirements_baseline", {})
                     .get("requirements", {})
                     .get("functional", []),
                     "badcases": req.badcases or [],
-                    "project_name": _projects[project_id]["name"],
+                    "project_name": (get_storage().get_project(project_id) or {}).get("name", ""),
                 }
             )
-            _tasks[task_id]["status"] = "completed"
-            _tasks[task_id]["result"] = result.to_dict()
+            get_storage().update_task(task_id, {"status": "completed", "result": result.to_dict()})
             # 代码生成类任务完成后自动入审核队列（代码需要人工Review）
             if req.task_type in ("generate_code", "fix_badcase", "full_delivery"):
                 _add_to_review_queue(project_id, f"delivery_{req.task_type}", result, requires_approval=True)
         except Exception as e:
-            _tasks[task_id]["status"] = "failed"
-            _tasks[task_id]["error"] = str(e)
+            get_storage().update_task(task_id, {"status": "failed", "error": str(e)})
 
     background_tasks.add_task(do_delivery)
     return {"success": True, "task_id": task_id, "message": f"开发交付任务[{req.task_type}]已启动"}
@@ -446,33 +443,39 @@ async def run_delivery(project_id: str, req: DeliveryRun, background_tasks: Back
 @app.post("/api/v1/projects/{project_id}/benchmarks/generate")
 async def generate_benchmark(project_id: str, background_tasks: BackgroundTasks):
     """生成Benchmark测试集"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {
-        "id": task_id,
-        "project_id": project_id,
-        "type": "benchmark_generate",
-        "status": "running",
-        "created_at": __import__("time").time(),
-    }
+    get_storage().create_task(
+        {
+            "id": task_id,
+            "project_id": project_id,
+            "type": "benchmark_generate",
+            "status": "running",
+            "created_at": __import__("time").time(),
+        }
+    )
 
     async def do_generate():
         try:
             tool = BenchmarkTool(project_id)
-            docs = _documents.get(project_id, [])
+            docs = get_storage().list_documents(project_id)
             doc_contents = [{"content": d.get("content", ""), "filename": d.get("filename", "")} for d in docs]
             benchmark = await tool.generate(doc_contents)
-            _benchmarks[benchmark["benchmark_id"]] = benchmark
-            _tasks[task_id]["status"] = "completed"
-            _tasks[task_id]["result"] = {
-                "benchmark_id": benchmark["benchmark_id"],
-                "case_count": benchmark["case_count"],
-            }
+            get_storage().save_benchmark(benchmark)
+            get_storage().update_task(
+                task_id,
+                {
+                    "status": "completed",
+                    "result": {
+                        "benchmark_id": benchmark["benchmark_id"],
+                        "case_count": benchmark["case_count"],
+                    },
+                },
+            )
         except Exception as e:
-            _tasks[task_id]["status"] = "failed"
-            _tasks[task_id]["error"] = str(e)
+            get_storage().update_task(task_id, {"status": "failed", "error": str(e)})
 
     background_tasks.add_task(do_generate)
     return {"success": True, "task_id": task_id, "message": "Benchmark生成已启动"}
@@ -481,40 +484,46 @@ async def generate_benchmark(project_id: str, background_tasks: BackgroundTasks)
 @app.get("/api/v1/projects/{project_id}/benchmarks")
 async def list_benchmarks(project_id: str):
     """Benchmark列表"""
-    bms = [bm for bm in _benchmarks.values() if bm.get("project_id") == project_id]
+    bms = get_storage().list_benchmarks(project_id)
     return {"success": True, "benchmarks": bms, "total": len(bms)}
 
 
 @app.post("/api/v1/projects/{project_id}/benchmarks/{benchmark_id}/run")
 async def run_benchmark_eval(project_id: str, benchmark_id: str, background_tasks: BackgroundTasks):
     """跑Benchmark评测"""
-    if benchmark_id not in _benchmarks:
+    if get_storage().get_benchmark(benchmark_id) is None:
         raise HTTPException(status_code=404, detail="Benchmark不存在")
 
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {
-        "id": task_id,
-        "project_id": project_id,
-        "type": "benchmark_eval",
-        "status": "running",
-        "created_at": __import__("time").time(),
-    }
+    get_storage().create_task(
+        {
+            "id": task_id,
+            "project_id": project_id,
+            "type": "benchmark_eval",
+            "status": "running",
+            "created_at": __import__("time").time(),
+        }
+    )
 
     async def do_eval():
         try:
-            bm = _benchmarks[benchmark_id]
+            bm = get_storage().get_benchmark(benchmark_id)
             evaluator = Evaluator(project_id)
             result = await evaluator.run_benchmark(bm["test_cases"])
             gate_passed, failed_items = evaluator.check_quality_gate(result)
-            _tasks[task_id]["status"] = "completed"
-            _tasks[task_id]["result"] = {
-                **result.to_dict(),
-                "gate_passed": gate_passed,
-                "failed_items": failed_items,
-            }
+            get_storage().update_task(
+                task_id,
+                {
+                    "status": "completed",
+                    "result": {
+                        **result.to_dict(),
+                        "gate_passed": gate_passed,
+                        "failed_items": failed_items,
+                    },
+                },
+            )
         except Exception as e:
-            _tasks[task_id]["status"] = "failed"
-            _tasks[task_id]["error"] = str(e)
+            get_storage().update_task(task_id, {"status": "failed", "error": str(e)})
 
     background_tasks.add_task(do_eval)
     return {"success": True, "task_id": task_id, "message": "Benchmark评测已启动"}
@@ -524,38 +533,44 @@ async def run_benchmark_eval(project_id: str, benchmark_id: str, background_task
 @app.post("/api/v1/projects/{project_id}/iteration/run")
 async def run_iteration(project_id: str, req: IterationRun, background_tasks: BackgroundTasks):
     """触发夜间迭代"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
 
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {
-        "id": task_id,
-        "project_id": project_id,
-        "type": "nightly_iteration",
-        "status": "running",
-        "created_at": __import__("time").time(),
-    }
+    get_storage().create_task(
+        {
+            "id": task_id,
+            "project_id": project_id,
+            "type": "nightly_iteration",
+            "status": "running",
+            "created_at": __import__("time").time(),
+        }
+    )
 
     async def do_iteration():
         try:
             pipeline = NightlyIterationPipeline(project_id)
             result = await pipeline.run(req.badcases, req.benchmark_cases)
-            _tasks[task_id]["status"] = "completed"
-            _tasks[task_id]["result"] = {
-                "success": result.success,
-                "version": result.version,
-                "auto_fixed": result.auto_fixed,
-                "need_human": result.need_human,
-                "regression_accuracy": result.regression_accuracy,
-                "gate_passed": result.gate_passed,
-                "deployed": result.deployed,
-                "rolled_back": result.rolled_back,
-                "duration_seconds": result.duration_seconds,
-                "report": result.report,
-            }
+            get_storage().update_task(
+                task_id,
+                {
+                    "status": "completed",
+                    "result": {
+                        "success": result.success,
+                        "version": result.version,
+                        "auto_fixed": result.auto_fixed,
+                        "need_human": result.need_human,
+                        "regression_accuracy": result.regression_accuracy,
+                        "gate_passed": result.gate_passed,
+                        "deployed": result.deployed,
+                        "rolled_back": result.rolled_back,
+                        "duration_seconds": result.duration_seconds,
+                        "report": result.report,
+                    },
+                },
+            )
         except Exception as e:
-            _tasks[task_id]["status"] = "failed"
-            _tasks[task_id]["error"] = str(e)
+            get_storage().update_task(task_id, {"status": "failed", "error": str(e)})
 
     background_tasks.add_task(do_iteration)
     return {"success": True, "task_id": task_id, "message": "夜间迭代已启动"}
@@ -565,7 +580,7 @@ async def run_iteration(project_id: str, req: IterationRun, background_tasks: Ba
 @app.post("/api/v1/projects/{project_id}/badcases")
 async def add_badcase(project_id: str, req: BadcaseFeedback):
     """提交Badcase反馈"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     badcase = {
         "id": str(uuid.uuid4()),
@@ -630,7 +645,7 @@ def _get_self_service_agent(project_id: str) -> SelfServiceAgent:
 @app.get("/api/v1/projects/{project_id}/self-service/progress")
 async def get_self_service_progress(project_id: str):
     """获取自助交付引导进度"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     return {"success": True, "progress": agent.get_guidance_progress()}
@@ -639,11 +654,11 @@ async def get_self_service_progress(project_id: str):
 @app.post("/api/v1/projects/{project_id}/self-service/opportunities")
 async def identify_opportunities(project_id: str, req: OpportunityIdentifyRequest, background_tasks: BackgroundTasks):
     """AI落地机会识别"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {"task_id": task_id, "status": "running", "type": "identify_opportunities"}
+    get_storage().create_task({"task_id": task_id, "status": "running", "type": "identify_opportunities"})
 
     async def _run():
         result = await agent.run(
@@ -654,15 +669,17 @@ async def identify_opportunities(project_id: str, req: OpportunityIdentifyReques
                 "pain_points": req.pain_points,
             }
         )
-        _tasks[task_id] = {
-            "task_id": task_id,
-            "status": "completed",
-            "type": "identify_opportunities",
-            "result": result.to_dict(),
-        }
+        get_storage().create_task(
+            {
+                "task_id": task_id,
+                "status": "completed",
+                "type": "identify_opportunities",
+                "result": result.to_dict(),
+            }
+        )
         # 如果需要FDE审核，加入审核队列
         if result.metadata.get("needs_fde_review"):
-            _review_queue.append(
+            get_storage().add_review(
                 {
                     "review_id": f"rev-{uuid.uuid4().hex[:8]}",
                     "project_id": project_id,
@@ -679,7 +696,7 @@ async def identify_opportunities(project_id: str, req: OpportunityIdentifyReques
 @app.post("/api/v1/projects/{project_id}/self-service/requirements")
 async def guide_requirements(project_id: str, req: RequirementGuideRequest):
     """需求自助梳理（生成初稿/确认/修改/补充）"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     result = await agent.run(
@@ -700,7 +717,7 @@ async def guide_requirements(project_id: str, req: RequirementGuideRequest):
 @app.post("/api/v1/projects/{project_id}/self-service/solution")
 async def configure_solution(project_id: str, req: SolutionConfigRequest):
     """方案自助配置"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     result = await agent.run(
@@ -729,7 +746,7 @@ async def configure_solution(project_id: str, req: SolutionConfigRequest):
 @app.post("/api/v1/projects/{project_id}/self-service/prototype")
 async def generate_prototype(project_id: str, req: PrototypeGenerateRequest):
     """原型即时生成"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     result = await agent.run(
@@ -745,7 +762,7 @@ async def generate_prototype(project_id: str, req: PrototypeGenerateRequest):
 @app.get("/api/v1/projects/{project_id}/self-service/value")
 async def get_value_dashboard(project_id: str):
     """获取价值仪表盘"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     # 如果还没有计算过价值，自动计算一次
@@ -769,7 +786,7 @@ async def get_value_dashboard(project_id: str):
 @app.post("/api/v1/projects/{project_id}/self-service/value/calculate")
 async def calculate_value(project_id: str, req: ValueCalculateRequest):
     """计算价值指标"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     result = await agent.run(
@@ -786,7 +803,7 @@ async def calculate_value(project_id: str, req: ValueCalculateRequest):
 @app.post("/api/v1/projects/{project_id}/self-service/feedback")
 async def submit_self_service_feedback(project_id: str, req: SelfServiceFeedback):
     """提交自助服务反馈"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     result = await agent.run(
@@ -799,24 +816,22 @@ async def submit_self_service_feedback(project_id: str, req: SelfServiceFeedback
         }
     )
     # 存储反馈
-    if project_id not in _feedback_store:
-        _feedback_store[project_id] = []
-    _feedback_store[project_id].append(result.structured_output.get("feedback", {}))
+    get_storage().add_feedback(project_id, result.structured_output.get("feedback", {}))
     return {"success": True, "result": result.structured_output}
 
 
 @app.get("/api/v1/projects/{project_id}/self-service/feedback")
 async def list_self_service_feedback(project_id: str):
     """获取项目反馈列表"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
-    return {"success": True, "feedback": _feedback_store.get(project_id, [])}
+    return {"success": True, "feedback": get_storage().list_feedback(project_id)}
 
 
 @app.post("/api/v1/projects/{project_id}/self-service/complete-step")
 async def complete_guidance_step(project_id: str, req: CompleteStepRequest):
     """完成引导步骤"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     result = await agent.run(
@@ -835,7 +850,7 @@ async def complete_guidance_step(project_id: str, req: CompleteStepRequest):
 @app.get("/api/v1/projects/{project_id}/self-service/deviations")
 async def get_deviation_alerts(project_id: str):
     """获取纠偏提醒列表"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     return {
@@ -851,7 +866,7 @@ async def get_deviation_alerts(project_id: str):
 @app.post("/api/v1/projects/{project_id}/self-service/training/push")
 async def push_training_content(project_id: str):
     """F7.10 培训内容推送：基于客户当前阶段推送培训内容"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     result = await agent.run({"task_type": "push_training"})
@@ -861,7 +876,7 @@ async def push_training_content(project_id: str):
 @app.get("/api/v1/projects/{project_id}/self-service/maturity")
 async def get_customer_maturity(project_id: str):
     """F7.11 客户成长路径：获取客户AI能力成熟度评估"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     result = await agent.run({"task_type": "assess_maturity", "behavior": {}})
@@ -871,7 +886,7 @@ async def get_customer_maturity(project_id: str):
 @app.post("/api/v1/projects/{project_id}/self-service/maturity/assess")
 async def assess_customer_maturity(project_id: str, req: dict):
     """F7.11 客户成长路径：基于行为数据评估成熟度"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     result = await agent.run({"task_type": "assess_maturity", "behavior": req.get("behavior", {})})
@@ -881,7 +896,7 @@ async def assess_customer_maturity(project_id: str, req: dict):
 @app.get("/api/v1/projects/{project_id}/self-service/quote")
 async def get_quote(project_id: str):
     """F7.12 付费转化引导：获取分阶段报价方案"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     result = await agent.run({"task_type": "generate_quote"})
@@ -891,7 +906,7 @@ async def get_quote(project_id: str):
 @app.post("/api/v1/projects/{project_id}/self-service/communications")
 async def log_communication(project_id: str, req: dict):
     """F7.13 客户沟通通道：记录沟通并生成摘要和行动项"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
     result = await agent.run(
@@ -911,26 +926,28 @@ async def log_communication(project_id: str, req: dict):
 @app.get("/api/v1/self-service/review/pending")
 async def list_pending_reviews():
     """获取待审核列表（FDE后台）"""
-    pending = [r for r in _review_queue if r["status"] == "pending"]
+    pending = get_storage().list_reviews(status="pending")
     return {"success": True, "pending_count": len(pending), "reviews": pending}
 
 
 @app.post("/api/v1/self-service/review/{review_id}/action")
 async def review_action(review_id: str, req: ReviewActionRequest):
     """审核操作（通过/驳回）"""
-    for review in _review_queue:
-        if review["review_id"] == review_id:
-            review["status"] = "approved" if req.action == "approve" else "rejected"
-            review["comment"] = req.comment
-            review["reviewer"] = req.reviewer
-            return {"success": True, "review": review}
-    raise HTTPException(status_code=404, detail="审核项不存在")
+    fields = {
+        "status": "approved" if req.action == "approve" else "rejected",
+        "comment": req.comment,
+        "reviewer": req.reviewer,
+    }
+    review = get_storage().update_review(review_id, fields)
+    if review is None:
+        raise HTTPException(status_code=404, detail="审核项不存在")
+    return {"success": True, "review": review}
 
 
 @app.get("/api/v1/self-service/review/history")
 async def list_review_history():
     """获取审核历史"""
-    return {"success": True, "reviews": _review_queue}
+    return {"success": True, "reviews": get_storage().list_reviews()}
 
 
 # ===== F8 FDE培训成长模块 =====
@@ -1087,15 +1104,16 @@ async def get_certifications(learner_id: str = "default"):
 @app.get("/api/v1/tasks/{task_id}")
 async def get_task(task_id: str):
     """获取任务状态"""
-    if task_id not in _tasks:
+    task = get_storage().get_task(task_id)
+    if task is None:
         raise HTTPException(status_code=404, detail="任务不存在")
-    return {"success": True, "task": _tasks[task_id]}
+    return {"success": True, "task": task}
 
 
 @app.get("/api/v1/projects/{project_id}/tasks")
 async def list_project_tasks(project_id: str):
     """项目任务列表"""
-    tasks = [t for t in _tasks.values() if t.get("project_id") == project_id]
+    tasks = get_storage().list_tasks(project_id)
     tasks.sort(key=lambda x: x.get("created_at", 0), reverse=True)
     return {"success": True, "tasks": tasks, "total": len(tasks)}
 
@@ -1104,10 +1122,10 @@ async def list_project_tasks(project_id: str):
 @app.get("/api/v1/projects/{project_id}/progress")
 async def project_progress(project_id: str):
     """项目进度"""
-    if project_id not in _projects:
+    if get_storage().get_project(project_id) is None:
         raise HTTPException(status_code=404, detail="项目不存在")
-    project = _projects[project_id]
-    tasks = [t for t in _tasks.values() if t.get("project_id") == project_id]
+    project = get_storage().get_project(project_id)
+    tasks = get_storage().list_tasks(project_id)
     completed = sum(1 for t in tasks if t.get("status") == "completed")
     return {
         "success": True,
@@ -1117,7 +1135,7 @@ async def project_progress(project_id: str):
         "total_tasks": len(tasks),
         "completed_tasks": completed,
         "progress": completed / len(tasks) if tasks else 0,
-        "documents_count": len(_documents.get(project_id, [])),
+        "documents_count": len(get_storage().list_documents(project_id)),
         "has_requirements": "requirements_baseline" in project,
         "has_solutions": "solutions" in project,
     }
