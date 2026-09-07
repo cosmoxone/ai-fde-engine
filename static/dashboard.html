@@ -113,6 +113,13 @@ pre { background: #0f1117; border: 1px solid #252836; border-radius: 6px; paddin
 
 <div class="main">
 
+  <!-- LLM配置提示条（v0.1.1 A3：未配置Key时显示） -->
+  <div id="llm-banner" style="display:none;background:rgba(255,180,0,0.12);border:1px solid rgba(255,180,0,0.4);border-radius:8px;padding:10px 16px;margin-bottom:16px;display:none;align-items:center;gap:12px;">
+    <span style="font-size:18px;">🔑</span>
+    <span style="flex:1;font-size:13px;color:#ffcf7d;">当前为 <b>Mock 模式</b>（未配置 LLM API Key，输出为模拟结果）。配置 DeepSeek / Qwen Key 后即刻切换真实模式，无需重启。</span>
+    <button class="btn btn-primary" style="padding:6px 14px;font-size:13px;" onclick="openSettings()">立即配置</button>
+  </div>
+
   <!-- 总览页 -->
   <div class="page active" id="page-overview">
     <div class="page-header">
@@ -328,11 +335,80 @@ POST /api/v1/self-service/review/{id}/action
   </div>
 </div>
 
+<!-- LLM设置弹窗（v0.1.1 A3） -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal" style="width:480px;">
+    <div class="modal-header"><h2>LLM 配置</h2><button class="modal-close" onclick="closeModal('settings-modal')">×</button></div>
+    <div class="modal-body">
+      <div style="margin-bottom:12px;font-size:12px;color:#888;">配置 API Key 后立即切换真实模式（保存即热生效，无需重启）。Key 仅存于本地 data/settings.json。</div>
+      <div style="margin-bottom:16px;"><label style="font-size:13px;color:#aaa;display:block;margin-bottom:6px;">Provider</label>
+        <select id="llm-provider" style="width:100%;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;font-size:14px;">
+          <option value="deepseek">DeepSeek（推荐）</option>
+          <option value="qwen">Qwen（通义千问）</option>
+        </select></div>
+      <div style="margin-bottom:16px;"><label style="font-size:13px;color:#aaa;display:block;margin-bottom:6px;">API Key</label>
+        <input id="llm-api-key" type="password" style="width:100%;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;font-size:14px;" placeholder="sk-..."></div>
+      <div style="margin-bottom:8px;"><label style="font-size:13px;color:#aaa;display:block;margin-bottom:6px;">Base URL（可选，默认官方地址）</label>
+        <input id="llm-base-url" style="width:100%;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;font-size:14px;" placeholder="https://api.deepseek.com/v1"></div>
+      <div id="llm-current" style="font-size:12px;color:#888;margin-top:12px;"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('settings-modal')">取消</button>
+      <button class="btn btn-primary" onclick="saveLLMSettings()">保存并热生效</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API = '/api/v1';
 let currentProjectId = null;
 let taskFilter = 'all';
 let charts = {};
+
+// ===== LLM 配置（v0.1.1 A3）=====
+async function checkLLMStatus() {
+  try {
+    const data = await api('/settings/llm');
+    const llm = data.llm || {};
+    const banner = document.getElementById('llm-banner');
+    if (llm.mode === 'mock') {
+      banner.style.display = 'flex';
+    } else {
+      banner.style.display = 'none';
+    }
+    const cur = document.getElementById('llm-current');
+    if (cur) cur.textContent = llm.configured
+      ? `当前：${llm.provider}（${llm.api_key_masked}）· 真实模式 ✅`
+      : '当前：未配置（Mock 模式）';
+  } catch (e) { /* 静默：老版本后端无此接口 */ }
+}
+
+function openSettings() {
+  checkLLMStatus();
+  document.getElementById('settings-modal').classList.add('active');
+}
+
+async function saveLLMSettings() {
+  const provider = document.getElementById('llm-provider').value;
+  const apiKey = document.getElementById('llm-api-key').value.trim();
+  const baseUrl = document.getElementById('llm-base-url').value.trim() || null;
+  if (!apiKey) { alert('请输入 API Key'); return; }
+  try {
+    const data = await api('/settings/llm', {
+      method: 'POST',
+      body: JSON.stringify({ provider, api_key: apiKey, base_url: baseUrl })
+    });
+    if (data.success) {
+      alert('✅ 配置已保存并热生效（' + (data.llm.mode === 'real' ? '真实模式' : 'Mock') + '）');
+      closeModal('settings-modal');
+      checkLLMStatus();
+      loadOverview();
+    }
+  } catch (e) {
+    alert('保存失败：' + e.message);
+  }
+}
+// ===== LLM 配置 END =====
 
 // 导航
 document.querySelectorAll('.nav-item').forEach(item => {
@@ -632,6 +708,7 @@ async function loadSelfService() {
 
 // 初始化
 loadOverview();
+checkLLMStatus();
 // 每30秒自动刷新总览
 setInterval(() => { if (document.getElementById('page-overview').classList.contains('active')) loadOverview(); }, 30000);
 // 响应式

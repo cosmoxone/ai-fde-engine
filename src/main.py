@@ -61,6 +61,10 @@ async def lifespan(app: FastAPI):
     # 启动时初始化
     os.makedirs(settings.openhands_workspace_base, exist_ok=True)
     os.makedirs(os.environ.get("MEMORY_STORAGE_DIR", "/tmp/aifde-memory"), exist_ok=True)
+    # 加载 Web 端保存的运行时设置（v0.1.1 A3：data/settings.json → 热恢复）
+    from .settings_runtime import load_runtime_settings
+
+    load_runtime_settings()
     yield
     # 关闭时清理
 
@@ -191,6 +195,37 @@ class ReviewActionRequest(BaseModel):
 
 
 # ===== 健康检查 =====
+# ===== 运行时设置（v0.1.1 A3：Web配置引导）=====
+
+
+class LLMSettingsRequest(BaseModel):
+    """LLM Key 配置请求"""
+
+    provider: str  # deepseek / qwen / openai / ollama / custom
+    api_key: str
+    base_url: Optional[str] = None
+
+
+@app.get("/api/v1/settings/llm")
+async def get_llm_settings():
+    """获取 LLM 配置状态（Key 脱敏）"""
+    from .settings_runtime import get_llm_status
+
+    return {"success": True, "llm": get_llm_status()}
+
+
+@app.post("/api/v1/settings/llm")
+async def update_llm_settings(req: LLMSettingsRequest):
+    """配置 LLM API Key（热生效，无需重启）"""
+    from .settings_runtime import save_llm_settings
+
+    try:
+        status = save_llm_settings(provider=req.provider, api_key=req.api_key, base_url=req.base_url)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"success": True, "llm": status, "message": "配置已保存并热生效"}
+
+
 @app.get("/api/v1/health")
 async def health_check():
     """健康检查"""
