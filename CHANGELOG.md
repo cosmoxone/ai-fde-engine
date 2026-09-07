@@ -3,6 +3,26 @@
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.1.1] - 2026-09-07
+
+### Added
+
+- **SQLite 单文件持久化（A1）**：默认 `STORAGE_PROVIDER=sqlite`，业务数据落 `data/aifde.db`（WAL），重启/升级不丢；内存实现保留给测试（`memory`）
+- **存储扩展点（A1/A5）**：`src/storage/` 抽象契约 + 双实现（memory/sqlite 契约测试 42 条双跑），TE 商业版可替换 PostgreSQL 后端
+- **商业扩展点预留（A5）**：`src/extensions/` PluginRegistry（注册/能力开关/edition 探测）+ AuthProvider 抽象（CE 默认 NoopAuth）
+- **单容器模式（A2）**：`docker run -v aifde-data:/app/data` 即全功能；六服务编排降级为可选 `docker-compose.full.yml`；Makefile 新增 `docker-single`
+- **Web 配置引导（A3）**：`GET/POST /api/v1/settings/llm`（Key 脱敏返回、保存即热生效、`data/settings.json` 持久化、启动自动恢复）；Dashboard Mock 模式提示条 + LLM 配置弹窗
+- **体验打磨（A4）**：`run_demo.sh` 交付物摘要导出到 `output/`
+
+### Fixed
+
+- **SQLite 更新丢列**：`INSERT OR REPLACE` 整行替换导致 `update_task` 后 `project_id` 附属列清空，任务按项目过滤失效；改为定向 `UPDATE data` 列，新增防回归契约测试
+
+### Changed
+
+- `main.py` 全部内存 dict 重构为 storage 调用（API 行为不变）
+- 测试 330 → **392**（存储 42 / 扩展点 10 / 运行时设置 9 / 原有 330 + 矩阵回填）
+
 ## [0.1.0] - 2026-09-06
 
 ### Added
