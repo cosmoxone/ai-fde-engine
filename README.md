@@ -6,16 +6,17 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-330%20passed-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-381%20passed-brightgreen.svg)](tests/)
 [![CI](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml)
 
 ## 当前状态（请先阅读）
 
-本项目处于 **MVP v1.0** 阶段，采用「接口真实 + 实现可切换」架构：
+本项目处于 **v0.1.x（0.x 系列，API 可能调整）** 阶段，采用「接口真实 + 实现可切换」架构：
 
-- ✅ **开箱可跑**：仅安装核心依赖（`requirements-core.txt`）、零 API Key，全部功能以 Mock/降级模式运行，330 个测试全绿
+- ✅ **开箱可跑**：仅安装核心依赖（`requirements-core.txt`）、零 API Key，全部功能以 Mock/降级模式运行，381 个测试全绿
 - ✅ **一键切换生产组件**：配置 `.env` 即可切换 DeepSeek/Qwen LLM、Docling 解析、Qdrant 知识库、DeepEval 评测、Aider 代码生成、Mem0 记忆（见 [模块切换指南](docs/05-模块切换指南.md)）
-- ⚠️ **已知边界（规划中）**：业务数据为内存态存储（v0.1.1 将落地 SQLite 单文件持久化）；夜间迭代当前需手动触发（后续版本进程内定时）。项目定位**本机/单容器**使用，API 无认证——请勿暴露公网。路线图见 [docs/09-后续规划.md](docs/09-后续规划.md)：开源主线聚焦单机开箱即用与交付价值，企业级特性（多用户/PostgreSQL/多租户）在商业轨道单独演进
+- ✅ **数据本地持久化（v0.1.1）**：SQLite 单文件 `data/aifde.db`，重启/升级数据不丢
+- ⚠️ **已知边界**：夜间迭代需手动触发（后续版本进程内定时）；项目定位**本机/单容器**使用，API 无认证——请勿暴露公网。路线图见 [docs/09-后续规划.md](docs/09-后续规划.md)：开源主线聚焦单机开箱即用与交付价值，企业级特性（多用户/PostgreSQL/多租户）在商业轨道单独演进
 
 ## 项目简介
 
@@ -51,7 +52,20 @@ AI-FDE Engine 是一套面向FDE团队的AI化交付生产系统，把FDE从「�
 
 ## 快速开始
 
-### 方式一：Docker Compose 一键部署（推荐）
+### 方式一：单容器模式（推荐，开箱即用）
+
+```bash
+# 核心镜像（Mock 模式 + SQLite 持久化），数据存于 docker 卷，重启/升级不丢
+docker build -f deploy/Dockerfile \
+  --build-arg REQUIREMENTS=requirements-core.txt \
+  -t aifde-engine .
+docker run -d --name aifde -p 8000:8000 -v aifde-data:/app/data aifde-engine
+
+# 浏览器打开 http://localhost:8000/dashboard
+# 在 Dashboard 设置页填入 LLM API Key 即切换真实模式（无需重启）
+```
+
+### 方式二：全量编排（可选，六服务：PG/Qdrant/MinIO/Redis/nginx）
 
 ```bash
 # 1. 克隆项目
@@ -65,10 +79,10 @@ vim deploy/.env
 
 # 3. 启动所有服务
 cd deploy
-docker compose up -d
+docker compose -f docker-compose.full.yml up -d
 
 # 4. 查看状态
-docker compose ps
+docker compose -f docker-compose.full.yml ps
 
 # 5. 访问Dashboard控制台
 # http://localhost:8000/dashboard
@@ -77,10 +91,10 @@ docker compose ps
 # http://localhost:8000/docs
 ```
 
-### 方式二：本地开发
+### 方式三：本地开发
 
 ```bash
-# 1. 安装核心依赖（Mock模式，零API Key可运行全部功能与330个测试）
+# 1. 安装核心依赖（Mock模式，零API Key可运行全部功能与381个测试）
 pip install -r requirements-core.txt
 pip install -e ".[dev]"
 
@@ -134,6 +148,13 @@ ai-fde-engine/
 ├── src/                           # 源代码
 │   ├── main.py                    # FastAPI主应用（REST API + Dashboard）
 │   ├── config.py                  # 配置管理（provider切换/模型路由）
+│   ├── storage/                   # 存储层（v0.1.1）
+│   │   ├── base.py                # StorageProvider契约（TE可扩展PG后端）
+│   │   ├── memory.py              # 内存实现（测试/演示）
+│   │   └── sqlite.py              # SQLite单文件实现（默认，data/aifde.db）
+│   ├── extensions/                # 商业扩展点（v0.1.1）
+│   │   ├── __init__.py            # PluginRegistry插件注册器
+│   │   └── auth.py                # AuthProvider抽象（CE默认NoopAuth）
 │   ├── agents/                    # Agent层（自研框架，Pydantic AI风格）
 │   │   ├── base.py                # Agent基类（Capabilities机制）
 │   │   ├── research.py            # 调研分析Agent（F1）
@@ -158,7 +179,7 @@ ai-fde-engine/
 │       └── iteration.py           # 夜间迭代流水线（DAG编排）
 ├── static/
 │   └── dashboard.html             # Dashboard控制台（单文件）
-├── tests/                         # 测试（330个：单元/集成/系统/自助/UAT）
+├── tests/                         # 测试（381个：存储/扩展点/单元/集成/系统/自助/UAT）
 ├── examples/                      # 示例（业务文档/Badcase/API演示脚本）
 ├── deploy/                        # 部署配置（Docker Compose/Nginx/备份）
 ├── cli.py                         # CLI工具（前后端分离，HTTP调用）
@@ -250,7 +271,9 @@ make test-cov
 make lint
 ```
 
-测试覆盖（共 330 个，全部通过）：
+测试覆盖（共 381 个，全部通过）：
+- 存储契约测试（41）：memory/sqlite 双实现契约、重启持久化、线程安全（v0.1.1）
+- 扩展点测试（10）：插件注册器、认证注入（v0.1.1）
 - 配置模块测试（9）
 - 记忆系统测试（14）：记忆读写、检索、巩固、持久化、跨项目
 - Agent测试（25）：四大Agent端到端流程 + Capability注入
@@ -300,7 +323,7 @@ CODE_GEN_PROVIDER=openhands
 
 # 3. 配置Zep、OpenHands等外部服务地址
 # 4. 重启服务
-docker compose restart ai-fde-app
+docker compose -f docker-compose.full.yml restart ai-fde-app
 ```
 
 ## 文档
@@ -332,7 +355,7 @@ docker compose restart ai-fde-app
 1. Fork 项目
 2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
 3. 提交更改（遵循 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/)）
-4. 确保 `make lint` 与 `make test`（330 个测试）通过
+4. 确保 `make lint` 与 `make test`（381 个测试）通过
 5. 推送分支并开启 Pull Request
 
 ## 许可证

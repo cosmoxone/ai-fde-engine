@@ -38,7 +38,7 @@ docker run --rm -v aifde_redis-data:/data -v "$BACKUP_DIR":/backup alpine \
 # 5. 配置文件备份
 echo "[5/5] 备份配置文件..."
 cp .env "$BACKUP_DIR/env.backup" 2>/dev/null || true
-cp docker-compose.yml "$BACKUP_DIR/" 2>/dev/null || true
+cp docker-compose.full.yml "$BACKUP_DIR/" 2>/dev/null || true
 
 # 备份信息
 echo ""
