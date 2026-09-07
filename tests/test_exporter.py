@@ -103,7 +103,8 @@ class TestBuildDeliverables:
     def test_empty_project_only_overview(self, client):
         pid = client.post("/api/v1/projects", json={"name": "空项目"}).json()["project"]["id"]
         items = build_deliverables(pid)
-        assert [d.key for d in items] == ["01-项目概览"]
+        keys = [d.key for d in items]
+        assert keys == ["01-项目概览", "07-复盘报告"]  # v0.2.0起复盘零数据也生成
 
 
 class TestExportZip:

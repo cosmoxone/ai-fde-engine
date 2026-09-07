@@ -68,6 +68,12 @@ def build_deliverables(project_id: str) -> list[Deliverable]:
     if reviews:
         add("06-评审记录", "评审记录", _render_reviews(project, reviews))
 
+    # 07 复盘报告（v0.2.0 D1：有执行数据即生成）
+    from .retrospective import build_retrospective
+
+    markdown, _stats = build_retrospective(project_id)
+    add("07-复盘报告", "项目复盘", markdown)
+
     return deliverables
 
 

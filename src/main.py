@@ -741,6 +741,54 @@ async def add_badcase(project_id: str, req: BadcaseFeedback):
 # ===== 可编辑确认流（v0.1.3 B4）=====
 
 
+@app.get("/api/v1/memory/global/search")
+async def global_memory_search(query: str, limit: int = 20):
+    """
+    跨项目全局记忆检索（v0.2.0 D1 本地经验库）
+    汇总全部项目记忆，按相关性与重要性排序——「这个客户类似问题以前怎么解决的？」
+    """
+    if not query.strip():
+        raise HTTPException(status_code=400, detail="query 不能为空")
+    storage = get_storage()
+    results = []
+    per_project = max(3, limit // 4)  # 每项目先取少量，合并后截断
+    for project in storage.list_projects():
+        memory = get_memory_manager(project["id"])
+        items = await memory.recall(query, limit=per_project)
+        for m in items:
+            results.append(
+                {
+                    **m.to_dict(),
+                    "project_name": project.get("name", project["id"]),
+                }
+            )
+    results.sort(key=lambda r: (r.get("importance", 0), r.get("access_count", 0)), reverse=True)
+    return {
+        "success": True,
+        "query": query,
+        "results": results[:limit],
+        "total": len(results),
+        "projects_searched": len(storage.list_projects()),
+    }
+
+
+@app.get("/api/v1/projects/{project_id}/retrospective")
+async def get_retrospective(project_id: str):
+    """
+    项目复盘报告（v0.2.0 D1）：一键生成交付复盘 markdown
+    聚合需求基线/执行统计/Benchmark质量/badcase处理/评审记录/记忆沉淀
+    """
+    storage = get_storage()
+    project = storage.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    from .exporter.retrospective import build_retrospective
+
+    markdown, stats = build_retrospective(project_id)
+    return {"success": True, "markdown": markdown, "stats": stats}
+
+
 @app.patch("/api/v1/projects/{project_id}/requirements/{req_id}")
 async def edit_requirement(project_id: str, req_id: str, req: RequirementEditRequest):
     """

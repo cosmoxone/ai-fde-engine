@@ -108,6 +108,7 @@ pre { background: #0f1117; border: 1px solid #252836; border-radius: 6px; paddin
   <div class="nav-item" data-page="quality"><span class="icon">✅</span><span>质量中心</span></div>
   <div class="nav-item" data-page="review"><span class="icon">🔍</span><span>审核工作台</span></div>
   <div class="nav-item" data-page="selfservice"><span class="icon">🤝</span><span>自助交付</span></div>
+  <div class="nav-item" data-page="memoryhub"><span class="icon">🧠</span><span>经验库</span></div>
   <div class="nav-item" data-page="api"><span class="icon">🔌</span><span>API文档</span></div>
 </div>
 
@@ -225,6 +226,29 @@ pre { background: #0f1117; border: 1px solid #252836; border-radius: 6px; paddin
     <div class="panel">
       <div class="panel-title">客户项目进度</div>
       <div id="ss-projects"></div>
+    </div>
+  </div>
+
+  <!-- 经验库页（v0.2.0 D1） -->
+  <div class="page" id="page-memoryhub">
+    <div class="page-header">
+      <div><h1>经验库</h1><div class="subtitle">跨项目记忆检索 · 一键复盘 · 经验资产复用</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">🔍 跨项目经验检索</div>
+      <div style="display:flex;gap:10px;margin:10px 0;">
+        <input id="mh-query" placeholder="例如：特采放行怎么处理的？ / 客户数据接入踩过什么坑？" style="flex:1;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;">
+        <button class="btn btn-primary" onclick="searchGlobalMemory()">检索</button>
+      </div>
+      <div id="mh-results"><div class="empty-state">输入关键词，检索所有项目沉淀的经验/决策/教训</div></div>
+    </div>
+    <div class="panel" style="margin-top:20px;">
+      <div class="panel-title">📋 项目复盘</div>
+      <div style="display:flex;gap:10px;margin:10px 0;align-items:center;">
+        <select id="mh-project" style="flex:1;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;"></select>
+        <button class="btn btn-primary" onclick="loadRetrospective()">生成复盘报告</button>
+      </div>
+      <div id="mh-retro"><div class="empty-state">选择项目 → 一键生成交付复盘（执行概况/质量处理/经验沉淀清单）</div></div>
     </div>
   </div>
 
@@ -395,6 +419,53 @@ let currentProjectId = null;
 let taskFilter = 'all';
 let charts = {};
 
+// ===== 经验库（v0.2.0 D1）=====
+async function loadMemoryHubProjects() {
+  try {
+    const data = await api('/projects');
+    document.getElementById('mh-project').innerHTML = (data.projects || []).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  } catch (e) { /* ignore */ }
+}
+
+async function searchGlobalMemory() {
+  const q = document.getElementById('mh-query').value.trim();
+  if (!q) return;
+  const el = document.getElementById('mh-results');
+  el.innerHTML = '<div class="empty-state">检索中...</div>';
+  try {
+    const data = await api(`/memory/global/search?query=${encodeURIComponent(q)}`);
+    el.innerHTML = (data.results || []).length
+      ? data.results.map(m => `<div style="padding:10px 0;border-bottom:1px solid #1e2130;">
+          <div style="display:flex;justify-content:space-between;">
+            <span class="badge badge-${m.memory_type}">${m.memory_type}</span>
+            <span style="color:#666;font-size:12px;">📦 ${m.project_name || m.project_id?.slice(0,8)}</span>
+          </div>
+          <div style="margin-top:4px;font-size:13px;">${(m.content || '').slice(0, 160)}</div>
+        </div>`).join('') + `<div style="color:#666;font-size:12px;margin-top:8px;">命中 ${data.total} 条 · 检索 ${data.projects_searched} 个项目</div>`
+      : '<div class="empty-state">无命中——本项目群还没有相关沉淀</div>';
+  } catch (e) { el.innerHTML = '<div class="empty-state">检索失败：' + e.message + '</div>'; }
+}
+
+async function loadRetrospective() {
+  const pid = document.getElementById('mh-project').value;
+  if (!pid) return;
+  const el = document.getElementById('mh-retro');
+  el.innerHTML = '<div class="empty-state">生成中...</div>';
+  try {
+    const data = await api(`/projects/${pid}/retrospective`);
+    if (data.success) {
+      el.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+          <button class="btn btn-secondary btn-sm" onclick="downloadRetro('${pid}')">⬇️ 下载 markdown</button>
+        </div>
+        <pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;color:#c9d1d9;max-height:420px;overflow:auto;">${data.markdown.replace(/</g, '&lt;')}</pre>`;
+    }
+  } catch (e) { el.innerHTML = '<div class="empty-state">生成失败：' + e.message + '</div>'; }
+}
+
+function downloadRetro(pid) {
+  window.open(`${API}/projects/${pid}/export?format=md&item=${encodeURIComponent('07-复盘报告')}`, '_blank');
+}
+
 // ===== 交付物导出（v0.1.2 B1）=====
 function exportDeliverables(projectId, fmt) {
   window.open(`${API}/projects/${projectId}/export?format=${fmt}`, '_blank');
@@ -502,6 +573,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
     document.getElementById('page-' + item.dataset.page).classList.add('active');
     if (item.dataset.page === 'overview') loadOverview();
     if (item.dataset.page === 'projects') loadProjects();
+    if (item.dataset.page === 'memoryhub') loadMemoryHubProjects();
     if (item.dataset.page === 'tasks') loadTasks();
     if (item.dataset.page === 'quality') loadQuality();
     if (item.dataset.page === 'review') loadReviewQueue();
@@ -584,6 +656,53 @@ async function loadProjects() {
       </td>
     </tr>
   `).join('') || '<tr><td colspan="7"><div class="empty-state">暂无项目</div></td></tr>';
+}
+
+// ===== 经验库（v0.2.0 D1）=====
+async function loadMemoryHubProjects() {
+  try {
+    const data = await api('/projects');
+    document.getElementById('mh-project').innerHTML = (data.projects || []).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  } catch (e) { /* ignore */ }
+}
+
+async function searchGlobalMemory() {
+  const q = document.getElementById('mh-query').value.trim();
+  if (!q) return;
+  const el = document.getElementById('mh-results');
+  el.innerHTML = '<div class="empty-state">检索中...</div>';
+  try {
+    const data = await api(`/memory/global/search?query=${encodeURIComponent(q)}`);
+    el.innerHTML = (data.results || []).length
+      ? data.results.map(m => `<div style="padding:10px 0;border-bottom:1px solid #1e2130;">
+          <div style="display:flex;justify-content:space-between;">
+            <span class="badge badge-${m.memory_type}">${m.memory_type}</span>
+            <span style="color:#666;font-size:12px;">📦 ${m.project_name || m.project_id?.slice(0,8)}</span>
+          </div>
+          <div style="margin-top:4px;font-size:13px;">${(m.content || '').slice(0, 160)}</div>
+        </div>`).join('') + `<div style="color:#666;font-size:12px;margin-top:8px;">命中 ${data.total} 条 · 检索 ${data.projects_searched} 个项目</div>`
+      : '<div class="empty-state">无命中——本项目群还没有相关沉淀</div>';
+  } catch (e) { el.innerHTML = '<div class="empty-state">检索失败：' + e.message + '</div>'; }
+}
+
+async function loadRetrospective() {
+  const pid = document.getElementById('mh-project').value;
+  if (!pid) return;
+  const el = document.getElementById('mh-retro');
+  el.innerHTML = '<div class="empty-state">生成中...</div>';
+  try {
+    const data = await api(`/projects/${pid}/retrospective`);
+    if (data.success) {
+      el.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+          <button class="btn btn-secondary btn-sm" onclick="downloadRetro('${pid}')">⬇️ 下载 markdown</button>
+        </div>
+        <pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;color:#c9d1d9;max-height:420px;overflow:auto;">${data.markdown.replace(/</g, '&lt;')}</pre>`;
+    }
+  } catch (e) { el.innerHTML = '<div class="empty-state">生成失败：' + e.message + '</div>'; }
+}
+
+function downloadRetro(pid) {
+  window.open(`${API}/projects/${pid}/export?format=md&item=${encodeURIComponent('07-复盘报告')}`, '_blank');
 }
 
 // ===== 交付物导出（v0.1.2 B1）=====
