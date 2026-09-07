@@ -7,7 +7,7 @@
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-1.0.0-orange.svg)](CHANGELOG.md)
 [![Tests](https://img.shields.io/badge/tests-330%20passed-brightgreen.svg)](tests/)
-[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-blue.svg)](.github/workflows/ci.yml)
+[![CI](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml)
 
 ## 当前状态（请先阅读）
 
