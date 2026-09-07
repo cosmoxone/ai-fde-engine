@@ -3,6 +3,24 @@
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.1.4] - 2026-09-07
+
+### Added
+
+- **MCP 工具全覆盖（C2）**：26 个工具覆盖完整交付流程（新增 12 个：文档上传/列表、Benchmark 生成/列表/评测、夜间迭代、badcase 提交/列表、交付物导出、需求编辑、记忆检索）——Claude Desktop/Cursor 用户可直接驱动全流程；multipart 上传双实现（requests/urllib 手工 boundary 降级）
+- **CLI 全流程整合（C1'）**：`aifde` 命令就绪（serve/doc/badcase/export/templates/golden/llm + 原有 project/agent/task/review）；`[project.scripts]` 入口，src 布局打包就绪（PyPI 发布按计划暂缓）
+- **英文 README（C3）**：`README.en.md` + 中文主页语言切换
+- **社区建设（C4）**：GitHub Discussions 开启（Show your delivery）；贡献方向标签（template/golden-set/good first issue）
+- **CI 覆盖率报告（C5'）**：pytest-cov → Job Summary（零外部服务依赖）
+
+### Fixed
+
+- CLI/MCP 客户端 urllib 路径 `data={}` 误判为无 body 导致 POST 422
+
+### Changed
+
+- 测试 444 → **450**（MCP 工具契约 6 条，另 1 条运行时用例随 mcp 包执行）
+
 ## [0.1.3] - 2026-09-07
 
 ### Added
