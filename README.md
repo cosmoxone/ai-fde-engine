@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-1.0.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.1.0-orange.svg)](CHANGELOG.md)
 [![Tests](https://img.shields.io/badge/tests-330%20passed-brightgreen.svg)](tests/)
 [![CI](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml)
 
@@ -15,7 +15,7 @@
 
 - ✅ **开箱可跑**：仅安装核心依赖（`requirements-core.txt`）、零 API Key，全部功能以 Mock/降级模式运行，330 个测试全绿
 - ✅ **一键切换生产组件**：配置 `.env` 即可切换 DeepSeek/Qwen LLM、Docling 解析、Qdrant 知识库、DeepEval 评测、Aider 代码生成、Mem0 记忆（见 [模块切换指南](docs/05-模块切换指南.md)）
-- ⚠️ **已知边界（规划中）**：业务数据为内存态存储（v1.1.0 将落地 SQLite 单文件持久化）；夜间迭代当前需手动触发（v1.1 进程内定时）。项目定位**本机/单容器**使用，API 无认证——请勿暴露公网。路线图见 [docs/09-后续规划.md](docs/09-后续规划.md)：开源主线聚焦单机开箱即用与交付价值，企业级特性（多用户/PostgreSQL/多租户）在商业轨道单独演进
+- ⚠️ **已知边界（规划中）**：业务数据为内存态存储（v0.1.1 将落地 SQLite 单文件持久化）；夜间迭代当前需手动触发（后续版本进程内定时）。项目定位**本机/单容器**使用，API 无认证——请勿暴露公网。路线图见 [docs/09-后续规划.md](docs/09-后续规划.md)：开源主线聚焦单机开箱即用与交付价值，企业级特性（多用户/PostgreSQL/多租户）在商业轨道单独演进
 
 ## 项目简介
 
@@ -315,7 +315,7 @@ docker compose restart ai-fde-app
 - [系统测试文档](docs/06-系统测试文档.md) — F1-F6系统测试用例设计
 - [用户验收测试文档](docs/07-用户验收测试文档.md) — 分角色UAT场景与记录模板
 - [测试用例追踪矩阵](docs/08-测试用例追踪矩阵.md) — 需求→用例→自动化脚本追踪
-- [后续规划](docs/09-后续规划.md) — 开源+商业双轨 Roadmap（v1.1 开箱即用 → TE/EE 商业版时间线）
+- [后续规划](docs/09-后续规划.md) — 开源+商业双轨 Roadmap（v0.1.1 开箱即用 → TE/EE 商业版时间线）
 - [商业计划](docs/10-商业计划.md) — Open-Core 商业化设计：FDE 痛点分层/竞品对比/定价/运营飞轮
 
 ## 版本说明
