@@ -1,0 +1,85 @@
+name: Publish Docker Image
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "镜像版本号（如 0.1.1）"
+        required: true
+        default: "0.1.1"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  publish:
+    name: Build & Push to GHCR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine version tag
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image name (lowercase)
+        id: img
+        run: echo "name=${IMAGE_NAME,,}" >> $GITHUB_OUTPUT
+
+      # 核心镜像：Mock 模式 + SQLite 持久化，开箱即用（约200MB）
+      # 全量镜像（Docling/Qdrant/DeepEval 等）体积大，暂不发布，本地按需构建
+      - name: Build and push core image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          build-args: |
+            REQUIREMENTS=requirements-core.txt
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.img.outputs.name }}:${{ steps.ver.outputs.version }}
+            ${{ env.REGISTRY }}/${{ steps.img.outputs.name }}:latest
+          labels: |
+            org.opencontainers.image.title=AI-FDE Engine
+            org.opencontainers.image.description=AI-driven FDE delivery engine (core: mock mode + SQLite)
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.ver.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify image runs (health check)
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ steps.img.outputs.name }}:${{ steps.ver.outputs.version }}
+          docker run -d --name verify -p 8000:8000 ${{ env.REGISTRY }}/${{ steps.img.outputs.name }}:${{ steps.ver.outputs.version }}
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/api/v1/health > /dev/null 2>&1; then
+              echo "✅ published image health check passed"; docker rm -f verify; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::published image failed to start"
+          docker logs verify | tail -30
+          exit 1
