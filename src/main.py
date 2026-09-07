@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.2.0",
+    version="0.2.1",
     description="AI驱动的FDE交付引擎 - 调研、设计、开发、迭代全流程AI化",
     lifespan=lifespan,
 )
@@ -314,7 +314,7 @@ async def health_check():
     """健康检查"""
     return {
         "status": "healthy",
-        "version": "0.2.0",
+        "version": "0.2.1",
         "app_name": settings.app_name,
         "env": settings.app_env,
         "active_projects": len(get_storage().list_projects()),

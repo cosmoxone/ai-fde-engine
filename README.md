@@ -7,7 +7,7 @@
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.2.1-orange.svg)](CHANGELOG.md)
 [![Tests](https://img.shields.io/badge/tests-470%20passed-brightgreen.svg)](tests/)
 [![CI](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml)
 
@@ -344,6 +344,7 @@ docker compose -f docker-compose.full.yml restart ai-fde-app
 
 详细文档请查看 [`docs/`](docs/) 目录：
 
+- [文档导读](docs/00-文档导读.md) — **按角色索引**：FDE上手/贡献者/了解项目，含设计基线与实现差异对照
 - [需求文档](docs/01-需求文档.md) — 角色体系、功能需求F1-F8、非功能需求、验收标准
 - [技术方案](docs/02-技术方案.md) — 架构设计、模块详细设计、数据模型、API设计
 - [验证方案](docs/03-验证方案.md) — 测试策略、性能测试、安全测试、验收标准
@@ -388,6 +389,7 @@ docker compose -f docker-compose.full.yml restart ai-fde-app
 
 - 💬 [GitHub Discussions](https://github.com/cosmoxone/ai-fde-engine/discussions)：提问交流、**Show your delivery**（展示真实交付案例）
 - 🐛 [Issues](https://github.com/cosmoxone/ai-fde-engine/issues)：缺陷报告与功能建议
+- ✍️ [方法论专栏](content/)：验证前置 / 质量门禁与夜间迭代 / 经验复利——每篇附 15 分钟可复现步骤
 
 ## 许可证
 
