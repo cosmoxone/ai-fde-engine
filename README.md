@@ -389,7 +389,6 @@ docker compose -f docker-compose.full.yml restart ai-fde-app
 
 - 💬 [GitHub Discussions](https://github.com/cosmoxone/ai-fde-engine/discussions)：提问交流、**Show your delivery**（展示真实交付案例）
 - 🐛 [Issues](https://github.com/cosmoxone/ai-fde-engine/issues)：缺陷报告与功能建议
-- ✍️ [方法论专栏](content/)：验证前置 / 质量门禁与夜间迭代 / 经验复利——每篇附 15 分钟可复现步骤
 
 ## 许可证
 

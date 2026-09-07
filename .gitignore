@@ -70,3 +70,6 @@ Thumbs.db
 # Docker
 docker-compose.override.yml
 output/
+
+# 内容专栏（本地管理，不随仓库发布）
+content/
