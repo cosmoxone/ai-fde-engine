@@ -12,7 +12,7 @@ from typing import Any, Optional
 
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -23,6 +23,7 @@ from .agents.self_service import SelfServiceAgent
 from .agents.training import TrainingAgent
 from .config import get_settings
 from .evaluation.evaluator import Evaluator
+from .exporter import build_deliverables, export_zip
 from .memory import get_memory_manager
 from .pipeline.iteration import NightlyIterationPipeline
 from .storage import get_storage
@@ -204,6 +205,60 @@ class LLMSettingsRequest(BaseModel):
     provider: str  # deepseek / qwen / openai / ollama / custom
     api_key: str
     base_url: Optional[str] = None
+
+
+# ===== 交付物导出（v0.1.2 B1）=====
+
+
+@app.get("/api/v1/projects/{project_id}/export/list")
+async def list_exportables(project_id: str):
+    """可导出的交付物清单"""
+    if get_storage().get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    items = build_deliverables(project_id)
+    return {
+        "success": True,
+        "items": [{"key": d.key, "title": d.title, "size": len(d.markdown)} for d in items],
+        "total": len(items),
+    }
+
+
+@app.get("/api/v1/projects/{project_id}/export")
+async def export_project(project_id: str, format: str = "md", item: Optional[str] = None):
+    """
+    导出交付物。
+
+    - format=md|docx：打包全部交付物为 zip
+    - item=<key>：单项 markdown 文本（format=md 时）
+    """
+    if get_storage().get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    if format not in ("md", "docx"):
+        raise HTTPException(status_code=400, detail="format 仅支持 md/docx")
+
+    if item:
+        deliverables = {d.key: d for d in build_deliverables(project_id)}
+        d = deliverables.get(item)
+        if d is None:
+            raise HTTPException(status_code=404, detail=f"交付物不存在: {item}")
+        from urllib.parse import quote
+
+        from fastapi.responses import PlainTextResponse
+
+        return PlainTextResponse(
+            d.markdown,
+            media_type="text/markdown; charset=utf-8",
+            headers={
+                "Content-Disposition": (f"attachment; filename=deliverable.md; filename*=UTF-8''{quote(d.key)}.md")
+            },
+        )
+
+    filename, content = export_zip(project_id, fmt=format)
+    return Response(
+        content=content,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/api/v1/settings/llm")

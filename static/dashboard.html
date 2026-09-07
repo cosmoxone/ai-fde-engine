@@ -495,13 +495,20 @@ async function loadProjects() {
       <td><span class="badge badge-${p.status === 'completed' ? 'completed' : 'running'}">${p.status}</span></td>
       <td style="width:120px;"><div class="progress-bar"><div class="progress-fill" style="width:${p.progress || 0}%"></div></div></td>
       <td>${p.task_count || 0}</td>
-      <td><button class="btn btn-secondary btn-sm" onclick="showProjectDetail('${p.id}')">详情</button></td>
+      <td style="white-space:nowrap;">
+        <button class="btn btn-secondary btn-sm" onclick="showProjectDetail('${p.id}')">详情</button>
+        <button class="btn btn-primary btn-sm" style="padding:3px 8px;font-size:12px;" title="导出全部交付物（Word）" onclick="exportDeliverables('${p.id}','docx')">📦 导出</button>
+      </td>
     </tr>
   `).join('') || '<tr><td colspan="7"><div class="empty-state">暂无项目</div></td></tr>';
 }
 
-async function showProjectDetail(projectId) {
-  currentProjectId = projectId;
+// ===== 交付物导出（v0.1.2 B1）=====
+function exportDeliverables(projectId, fmt) {
+  // 触发浏览器下载 zip
+  window.open(`${API}/projects/${projectId}/export?format=${fmt}`, '_blank');
+}
+async function showProjectDetail(projectId) {  currentProjectId = projectId;
   const data = await api('/projects/' + projectId);
   const p = data.project || data;
   document.getElementById('modal-project-name').textContent = p.name || '项目详情';

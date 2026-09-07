@@ -11,6 +11,17 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
+@pytest.fixture
+def client():
+    """FastAPI TestClient（隔离存储环境由 autouse fixture 保证）"""
+    from fastapi.testclient import TestClient
+
+    from src.main import app
+
+    with TestClient(app) as c:
+        yield c
+
+
 @pytest.fixture(autouse=True)
 def isolated_memory_dir(tmp_path):
     """每个测试使用独立的记忆存储目录 + 内存存储，避免测试间污染（v0.1.1 A1）"""
