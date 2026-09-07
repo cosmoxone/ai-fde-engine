@@ -7,15 +7,15 @@
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.3-orange.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-450%20passed-brightgreen.svg)](tests/)
+[![Version](https://img.shields.io/badge/version-0.2.0-orange.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-470%20passed-brightgreen.svg)](tests/)
 [![CI](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml)
 
 ## 当前状态（请先阅读）
 
 本项目处于 **v0.1.x（0.x 系列，API 可能调整）** 阶段，采用「接口真实 + 实现可切换」架构：
 
-- ✅ **开箱可跑**：仅安装核心依赖（`requirements-core.txt`）、零 API Key，全部功能以 Mock/降级模式运行，450 个测试全绿
+- ✅ **开箱可跑**：仅安装核心依赖（`requirements-core.txt`）、零 API Key，全部功能以 Mock/降级模式运行，470 个测试全绿
 - ✅ **一键切换生产组件**：配置 `.env` 即可切换 DeepSeek/Qwen LLM、Docling 解析、Qdrant 知识库、DeepEval 评测、Aider 代码生成、Mem0 记忆（见 [模块切换指南](docs/05-模块切换指南.md)）
 - ✅ **数据本地持久化（v0.1.1）**：SQLite 单文件 `data/aifde.db`，重启/升级数据不丢
 - ⚠️ **已知边界**：夜间迭代需手动触发（后续版本进程内定时）；项目定位**本机/单容器**使用，API 无认证——请勿暴露公网。路线图见 [docs/09-后续规划.md](docs/09-后续规划.md)：开源主线聚焦单机开箱即用与交付价值，企业级特性（多用户/PostgreSQL/多租户）在商业轨道单独演进
@@ -98,7 +98,7 @@ docker compose -f docker-compose.full.yml ps
 ### 方式三：本地开发
 
 ```bash
-# 1. 安装核心依赖（Mock模式，零API Key可运行全部功能与450个测试）
+# 1. 安装核心依赖（Mock模式，零API Key可运行全部功能与470个测试）
 pip install -r requirements-core.txt
 pip install -e ".[dev]"
 
@@ -276,7 +276,7 @@ make test-cov
 make lint
 ```
 
-测试覆盖（共 450 个，全部通过）：
+测试覆盖（共 470 个，全部通过）：
 - 存储契约测试（42）：memory/sqlite 双实现契约、重启持久化、线程安全（v0.1.1）
 - 扩展点测试（10）：插件注册器、认证注入（v0.1.1）
 - 配置模块测试（9）
@@ -295,6 +295,10 @@ make lint
 - LLM质量测试（8）：schema重试/Design LLM接入/黄金集（v0.1.2 B3）
 - Badcase闭环测试（9）：入库/建议/自动归集（v0.1.2 B5）
 - 可编辑确认流测试（6）：需求/功能项编辑进基线并导出（v0.1.3 B4）
+- MCP工具测试（6）：26工具/全流程覆盖/dispatch无孤儿（v0.1.4 C2）
+- 经验库测试（6）：跨项目检索/复盘报告（v0.2.0 D1）
+- 模板校验测试（11）：贡献红线（v0.2.0 D2）
+- 基准报告测试（3）：可复现基线（v0.2.0 D3）
 
 > 需求-用例-脚本追踪见 [测试用例追踪矩阵](docs/08-测试用例追踪矩阵.md)。
 
@@ -351,6 +355,8 @@ docker compose -f docker-compose.full.yml restart ai-fde-app
 - [后续规划](docs/09-后续规划.md) — 开源+商业双轨 Roadmap（v0.1.1 开箱即用 → TE/EE 商业版时间线）
 - [商业计划](docs/10-商业计划.md) — Open-Core 商业化设计：FDE 痛点分层/竞品对比/定价/运营飞轮
 - [用户手册](docs/11-用户手册.md) — FDE 视角操作指南：30 分钟跑通首个项目全流程
+- [模板贡献指南](docs/12-模板贡献指南.md) — 行业模板包贡献规范与质量红线
+- [公开评测基准](docs/benchmarks/baseline.md) — 种子集×评测器基线（可复现）
 
 ## 版本说明
 

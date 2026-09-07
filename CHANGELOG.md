@@ -3,6 +3,18 @@
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.2.0] - 2026-09-07
+
+### Added
+
+- **本地经验库（D1）**：`GET /api/v1/memory/global/search` 跨项目记忆检索（按重要性排序、标注来源项目）——「这个客户类似问题以前怎么解决的」；`GET /projects/{id}/retrospective` 一键复盘报告（执行概况/需求范围/质量与 badcase 归因/评审协同/经验沉淀清单，零数据容错）；复盘纳入交付物（07-复盘报告，MD/DOCX）；Dashboard 新增 🧠 经验库页
+- **模板贡献体系（D2）**：`src/templates/validate.py` 贡献准入校验器（量化验收红线/对抗安全红线/三类齐备，CLI 一键自检）；`docs/12-模板贡献指南.md`（字段规范/评审标准/认领方向）
+- **公开评测基准（D3）**：`python -m src.evaluation.benchmark_report` —— 内置种子集 × 评测器基线（三行业指标 + 门禁判定），mock 模式零依赖可复现；报告输出至 `docs/benchmarks/baseline.md`
+
+### Changed
+
+- 测试 450 → **470**（经验库 6/模板校验 11/基准报告 3）
+
 ## [0.1.4] - 2026-09-07
 
 ### Added
