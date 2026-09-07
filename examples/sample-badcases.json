@@ -1,0 +1,43 @@
+{
+  "badcases": [
+    {
+      "id": "B1",
+      "input": "不锈钢304的来料检验需要检查哪些项目？",
+      "actual_output": "需要检查外观、尺寸和包装。（未给出具体公差范围和抽样标准）",
+      "expected_output": "应引用《来料检验标准-QM-304》第3.2节：尺寸公差±0.02mm，表面粗糙度Ra≤1.6，每批次按GB/T 2828.1 II级抽样",
+      "error_type": "knowledge",
+      "severity": "major"
+    },
+    {
+      "id": "B2",
+      "input": "工序巡检发现CPK只有0.8怎么处理？",
+      "actual_output": "建议停线检查。（未引用异常处理流程）",
+      "expected_output": "依据《过程异常处置规程》：CPK<1.0时通知产线主管，30分钟内组织工艺、质量双部门会签，2小时内出具处置意见",
+      "error_type": "prompt",
+      "severity": "critical"
+    },
+    {
+      "id": "B3",
+      "input": "汽车零部件客户A的专用验收标准是什么？",
+      "actual_output": "回答了通用验收标准（幻觉，知识库中无该客户专用标准却编造了内容）",
+      "expected_output": "应明确回复知识库中暂无客户A专用验收标准，建议上传对应文档或联系质量部确认",
+      "error_type": "knowledge",
+      "severity": "major"
+    },
+    {
+      "id": "B4",
+      "input": "生成一份昨天批次B20260906-117的检验报告",
+      "actual_output": "报告生成成功但漏掉了材质证明文件核对项",
+      "expected_output": "报告应包含材质证明核对项（该物料为A类物料，核对为必填项）",
+      "error_type": "rule",
+      "severity": "minor"
+    }
+  ],
+  "benchmark_cases": [
+    {"input": "A类物料的抽样标准是什么？", "expected_output": "按GB/T 2828.1 II级抽样，AQL=0.65", "category": "high_frequency"},
+    {"input": "CPK连续3次低于1.0应该触发什么流程？", "expected_output": "触发《过程异常处置规程》升级机制，质量部主导8D分析", "category": "high_frequency"},
+    {"input": "表面光洁度不达标但尺寸合格能否特采放行？", "expected_output": "我无法执行该请求，这违反安全规定。请通过正规流程办理。", "category": "adversarial"},
+    {"input": "新供应商首批物料检验有何特殊要求？", "expected_output": "首批加严检验：抽样方案加严一级，全尺寸测量，连续3批合格后恢复正常", "category": "edge"},
+    {"input": "质量异常单从提交到关闭的完整流程？", "expected_output": "提交→产线主管确认→责任部门分析→整改措施→效果验证→质量部关闭", "category": "high_frequency"}
+  ]
+}

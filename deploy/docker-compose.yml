@@ -1,0 +1,183 @@
+# ============================================
+# AI-FDE Engine Docker Compose 部署配置
+# 用法：
+#   1. cp .env.example .env  并修改配置
+#   2. docker compose up -d
+#   3. 访问 http://localhost:8000/docs
+# ============================================
+
+services:
+  # ===== 反向代理 =====
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: aifde-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      # - "443:443"  # HTTPS时启用
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      # - ./ssl:/etc/nginx/ssl:ro  # SSL证书
+    depends_on:
+      - ai-fde-app
+    networks:
+      - aifde-network
+    mem_limit: 256m
+    cpus: 0.5
+
+  # ===== 主应用 =====
+  ai-fde-app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: aifde-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_HOST=postgresql
+      - QDRANT_HOST=qdrant
+      - MINIO_ENDPOINT=minio:9000
+      - REDIS_HOST=redis
+    volumes:
+      - app-data:/app/data
+      - app-logs:/app/logs
+      - memory-data:/tmp/aifde-memory
+      - docs-data:/tmp/aifde-docs
+      - workspace-data:/tmp/openhands-workspaces
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+      minio:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - aifde-network
+    mem_limit: 4g
+    cpus: 2.0
+
+  # ===== PostgreSQL（关系数据库 + 向量扩展）=====
+  postgresql:
+    image: pgvector/pgvector:pg16
+    container_name: aifde-postgresql
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aifde}
+      POSTGRES_USER: ${POSTGRES_USER:-aifde}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aifde_password}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aifde} -d ${POSTGRES_DB:-aifde}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aifde-network
+    mem_limit: 4g
+    cpus: 2.0
+
+  # ===== Qdrant（向量数据库）=====
+  qdrant:
+    image: qdrant/qdrant:v1.18.3
+    container_name: aifde-qdrant
+    restart: unless-stopped
+    volumes:
+      - qdrant-data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
+    networks:
+      - aifde-network
+    mem_limit: 4g
+    cpus: 2.0
+
+  # ===== MinIO（对象存储）=====
+  minio:
+    image: minio/minio:latest
+    container_name: aifde-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-aifde_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-aifde_minio_secret}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - aifde-network
+    mem_limit: 2g
+    cpus: 1.0
+
+  # ===== Redis（缓存 + 任务队列）=====
+  redis:
+    image: redis:7-alpine
+    container_name: aifde-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aifde-network
+    mem_limit: 1g
+    cpus: 0.5
+
+  # ===== 可选：LangFuse（LLM可观测性）=====
+  # 启用方式：取消注释，并设置 OBSERVABILITY_PROVIDER=langfuse
+  # langfuse:
+  #   image: langfuse/langfuse:3
+  #   container_name: aifde-langfuse
+  #   restart: unless-stopped
+  #   environment:
+  #     DATABASE_URL: postgresql://langfuse:langfuse_password@langfuse-db:5432/langfuse
+  #     NEXTAUTH_SECRET: change-me
+  #     SALT: change-me
+  #     TELEMETRY_ENABLED: "false"
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - langfuse-db
+  #   networks:
+  #     - aifde-network
+  #   mem_limit: 2g
+
+  # langfuse-db:
+  #   image: postgres:16-alpine
+  #   container_name: aifde-langfuse-db
+  #   environment:
+  #     POSTGRES_DB: langfuse
+  #     POSTGRES_USER: langfuse
+  #     POSTGRES_PASSWORD: langfuse_password
+  #   volumes:
+  #     - langfuse-db-data:/var/lib/postgresql/data
+  #   networks:
+  #     - aifde-network
+
+# ===== 数据卷 =====
+volumes:
+  pg-data:
+  qdrant-data:
+  minio-data:
+  redis-data:
+  app-data:
+  app-logs:
+  memory-data:
+  docs-data:
+  workspace-data:
+  # langfuse-db-data:
+
+# ===== 网络 =====
+networks:
+  aifde-network:
+    driver: bridge

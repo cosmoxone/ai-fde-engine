@@ -1,0 +1,71 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 测试
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+.tox/
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 数据
+data/
+logs/
+*.log
+/tmp/
+
+# 记忆存储（仅数据目录，勿忽略 src/memory 源码）
+/data/memory/
+*.json.memory
+
+# 工作区
+workspaces/
+openhands-workspaces/
+
+# 文档构建
+docs/_build/
+docs/build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+docker-compose.override.yml

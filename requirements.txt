@@ -1,0 +1,88 @@
+# AI-FDE Engine Python依赖
+# 生产环境开箱即用：包含所有真实模块依赖
+# MVP开发模式：仅需核心框架，系统自动降级到Mock实现
+
+# ===== 核心框架 =====
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-multipart>=0.0.7
+
+# ===== 异步与HTTP =====
+httpx>=0.27.0
+aiofiles>=23.2.0
+
+# ===== 数据库 =====
+sqlalchemy>=2.0.0
+psycopg[binary]>=3.1.0
+alembic>=1.13.0
+
+# ===== 缓存与队列 =====
+redis>=5.0.0
+
+# ===== 对象存储 =====
+minio>=7.2.0
+
+# ===== 向量数据库 =====
+qdrant-client>=1.9.0
+
+# ===== AI Agent框架 =====
+pydantic-ai>=0.8.0
+
+# ===== 文档解析（生产环境默认启用）=====
+# Docling: 多格式文档解析(PDF/DOCX/PPTX/图片)，CPU可用，76.0分
+docling>=2.0.0
+
+# ===== 知识库（生产环境默认启用）=====
+# 本地Embedding模型（多语言bge-m3，1024维）
+sentence-transformers>=3.0.0
+
+# ===== 评测引擎（生产环境默认启用）=====
+# DeepEval: 50+ LLM评测指标，pytest原生，CI/CD集成
+deepeval>=0.24.0
+
+# ===== 代码生成（生产环境默认启用）=====
+# Aider: 终端原生AI编程助手，git工作流，多模型支持
+aider-chat>=0.60.0
+
+# ===== 记忆系统（生产环境默认启用）=====
+# Mem0: 智能记忆层，支持实体抽取、语义检索、跨用户记忆
+mem0ai>=0.1.0
+
+# ===== 工具 =====
+python-dotenv>=1.0.0
+pyyaml>=6.0
+jinja2>=3.1.0
+
+# ===== 测试 =====
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
+
+# ============================================
+# 以下为可选增强依赖（按需安装，非必须）
+# ============================================
+
+# ===== 文档解析增强（GPU加速，可选）=====
+# Marker v2: PDF专用解析，GPU加速7.4页/秒，总分76.0超Docling
+# marker-pdf>=1.0.0
+
+# ===== 知识库增强（可选）=====
+# LightRAG: 知识图谱增强RAG，EMNLP'25，29k+ stars（替代qdrant方案）
+# lightrag>=1.0.0
+
+# ===== 代码生成增强（可选，需要Docker沙箱）=====
+# OpenHands: 自主编程Agent，SWE-bench Verified 77%
+# openhands>=0.1.0
+
+# OpenCode: 终端原生Agent，MCP协议支持（npm安装）
+# npm install -g opencode-ai
+
+# ===== 记忆系统增强（可选，需要Docker服务）=====
+# Zep Graphiti: 时序知识图谱记忆，LongMemEval 63.8%
+# graphiti>=1.0.0
+
+# ===== 可观测性增强（可选，需要Docker服务）=====
+# LangFuse: LLM可观测性，追踪、评估、提示词管理
+# langfuse>=3.0.0

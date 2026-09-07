@@ -1,0 +1,36 @@
+# ============================================
+# AI-FDE Engine 核心依赖（Mock 模式，开箱可跑）
+# 安装后无需任何 API Key / 外部服务即可运行全部功能与 330 个测试
+# 生产环境完整依赖见 requirements.txt（Docling/Qdrant/DeepEval/Aider/Mem0 等）
+# ============================================
+
+# ===== 核心框架 =====
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-multipart>=0.0.7
+
+# ===== 异步与HTTP =====
+httpx>=0.27.0
+aiofiles>=23.2.0
+
+# ===== 工具 =====
+python-dotenv>=1.0.0
+pyyaml>=6.0
+jinja2>=3.1.0
+
+# ===== 测试 =====
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
+
+# ============================================
+# 说明：
+# - 数据库/缓存/向量库客户端（sqlalchemy/redis/qdrant-client/minio）
+#   位于 pyproject.toml 主依赖，随 `pip install -e .` 安装
+# - 文档解析/评测/代码生成/记忆等真实组件依赖为可选：
+#   pip install -e ".[dev]"     # 开发工具
+#   pip install -e ".[all]"     # Docling + Marker + DeepEval
+#   完整清单见 requirements.txt
+# ============================================

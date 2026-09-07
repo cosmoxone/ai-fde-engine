@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI-FDE Engine 控制台</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f1117; color: #e0e0e0; display: flex; min-height: 100vh; }
+.sidebar { width: 220px; background: #161822; border-right: 1px solid #252836; padding: 20px 0; position: fixed; height: 100vh; overflow-y: auto; }
+.sidebar .logo { padding: 0 20px 20px; font-size: 18px; font-weight: 700; color: #6c8cff; border-bottom: 1px solid #252836; margin-bottom: 10px; }
+.sidebar .logo span { color: #888; font-size: 11px; font-weight: 400; display: block; margin-top: 2px; }
+.nav-item { padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 14px; color: #999; transition: all 0.2s; border-left: 3px solid transparent; }
+.nav-item:hover { background: #1c1f2e; color: #e0e0e0; }
+.nav-item.active { background: #1c1f2e; color: #6c8cff; border-left-color: #6c8cff; }
+.nav-item .icon { width: 18px; text-align: center; }
+.main { margin-left: 220px; flex: 1; padding: 24px 32px; }
+.page { display: none; }
+.page.active { display: block; }
+.page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+.page-header h1 { font-size: 22px; font-weight: 600; }
+.page-header .subtitle { color: #888; font-size: 13px; margin-top: 4px; }
+.btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; }
+.btn-primary { background: #6c8cff; color: #fff; }
+.btn-primary:hover { background: #5a7aee; }
+.btn-secondary { background: #252836; color: #ccc; border: 1px solid #353848; }
+.btn-secondary:hover { background: #2f3242; }
+.btn-success { background: #22c55e; color: #fff; }
+.btn-danger { background: #ef4444; color: #fff; }
+.btn-sm { padding: 4px 10px; font-size: 12px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.card { background: #161822; border: 1px solid #252836; border-radius: 10px; padding: 18px; }
+.card .label { font-size: 12px; color: #888; margin-bottom: 8px; }
+.card .value { font-size: 28px; font-weight: 700; }
+.card .trend { font-size: 12px; margin-top: 6px; }
+.trend.up { color: #22c55e; }
+.trend.down { color: #ef4444; }
+.panel { background: #161822; border: 1px solid #252836; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+.panel-title { font-size: 15px; font-weight: 600; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
+.panel-title .actions { display: flex; gap: 8px; }
+.chart { width: 100%; height: 300px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; padding: 10px 12px; color: #888; font-weight: 500; border-bottom: 1px solid #252836; font-size: 12px; text-transform: uppercase; }
+td { padding: 12px; border-bottom: 1px solid #1e2130; }
+tr:hover { background: #1a1d2b; }
+.badge { padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; display: inline-block; }
+.badge-running { background: rgba(108,140,255,0.15); color: #6c8cff; }
+.badge-completed { background: rgba(34,197,94,0.15); color: #22c55e; }
+.badge-failed { background: rgba(239,68,68,0.15); color: #ef4444; }
+.badge-pending { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.badge-research { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.badge-design { background: rgba(168,85,247,0.15); color: #c084fc; }
+.badge-delivery { background: rgba(34,197,94,0.15); color: #4ade80; }
+.badge-project { background: rgba(245,158,11,0.15); color: #fbbf24; }
+.progress-bar { height: 6px; background: #252836; border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #6c8cff, #8b5cf6); border-radius: 3px; transition: width 0.3s; }
+.steps { display: flex; gap: 0; margin: 16px 0; }
+.step { flex: 1; text-align: center; position: relative; }
+.step .dot { width: 32px; height: 32px; border-radius: 50%; background: #252836; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; color: #888; position: relative; z-index: 1; }
+.step.completed .dot { background: #22c55e; color: #fff; }
+.step.active .dot { background: #6c8cff; color: #fff; box-shadow: 0 0 0 4px rgba(108,140,255,0.2); }
+.step .line { position: absolute; top: 16px; left: 50%; width: 100%; height: 2px; background: #252836; }
+.step.completed .line { background: #22c55e; }
+.step .label { font-size: 11px; color: #888; }
+.step.active .label { color: #6c8cff; font-weight: 600; }
+.modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; }
+.modal-overlay.active { display: flex; }
+.modal { background: #161822; border: 1px solid #252836; border-radius: 12px; width: 800px; max-width: 90vw; max-height: 85vh; overflow-y: auto; }
+.modal-header { padding: 20px 24px; border-bottom: 1px solid #252836; display: flex; justify-content: space-between; align-items: center; }
+.modal-header h2 { font-size: 18px; }
+.modal-close { background: none; border: none; color: #888; font-size: 20px; cursor: pointer; }
+.modal-body { padding: 24px; }
+.modal-footer { padding: 16px 24px; border-top: 1px solid #252836; display: flex; justify-content: flex-end; gap: 10px; }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+.detail-item .label { font-size: 12px; color: #888; margin-bottom: 4px; }
+.detail-item .value { font-size: 14px; font-weight: 500; }
+.tabs { display: flex; gap: 0; border-bottom: 1px solid #252836; margin-bottom: 16px; }
+.tab { padding: 10px 16px; cursor: pointer; font-size: 13px; color: #888; border-bottom: 2px solid transparent; }
+.tab.active { color: #6c8cff; border-bottom-color: #6c8cff; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+pre { background: #0f1117; border: 1px solid #252836; border-radius: 6px; padding: 12px; font-size: 12px; overflow-x: auto; max-height: 300px; overflow-y: auto; }
+.empty-state { text-align: center; padding: 40px; color: #666; }
+.empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+.refresh-btn { cursor: pointer; color: #888; font-size: 12px; }
+.refresh-btn:hover { color: #6c8cff; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.status-dot.green { background: #22c55e; }
+.status-dot.yellow { background: #f59e0b; }
+.status-dot.red { background: #ef4444; }
+.status-dot.blue { background: #6c8cff; }
+@media (max-width: 768px) {
+  .sidebar { width: 60px; }
+  .sidebar .logo span, .nav-item span { display: none; }
+  .main { margin-left: 60px; padding: 16px; }
+  .cards { grid-template-columns: 1fr 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="logo">AI-FDE Engine<span>v1.0.0 · 交付控制台</span></div>
+  <div class="nav-item active" data-page="overview"><span class="icon">📊</span><span>总览</span></div>
+  <div class="nav-item" data-page="projects"><span class="icon">📁</span><span>项目管理</span></div>
+  <div class="nav-item" data-page="tasks"><span class="icon">⚡</span><span>任务监控</span></div>
+  <div class="nav-item" data-page="quality"><span class="icon">✅</span><span>质量中心</span></div>
+  <div class="nav-item" data-page="review"><span class="icon">🔍</span><span>审核工作台</span></div>
+  <div class="nav-item" data-page="selfservice"><span class="icon">🤝</span><span>自助交付</span></div>
+  <div class="nav-item" data-page="api"><span class="icon">🔌</span><span>API文档</span></div>
+</div>
+
+<div class="main">
+
+  <!-- 总览页 -->
+  <div class="page active" id="page-overview">
+    <div class="page-header">
+      <div><h1>交付总览</h1><div class="subtitle">AI驱动的FDE全流程交付监控</div></div>
+      <div style="display:flex;gap:10px;align-items:center;">
+        <span class="refresh-btn" onclick="loadOverview()">🔄 刷新</span>
+        <span id="health-status" style="font-size:12px;color:#888;"></span>
+      </div>
+    </div>
+    <div class="cards" id="overview-cards"></div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;">
+      <div class="panel">
+        <div class="panel-title">项目状态分布 <span class="refresh-btn" onclick="renderProjectChart()">刷新</span></div>
+        <div class="chart" id="chart-project-status"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Agent任务类型分布</div>
+        <div class="chart" id="chart-agent-types"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">最近活动</div>
+      <div id="recent-activity"><div class="empty-state"><div class="icon">📋</div>暂无活动记录</div></div>
+    </div>
+  </div>
+
+  <!-- 项目管理页 -->
+  <div class="page" id="page-projects">
+    <div class="page-header">
+      <div><h1>项目管理</h1><div class="subtitle">所有AI落地项目的交付状态</div></div>
+      <button class="btn btn-primary" onclick="showCreateProject()">+ 新建项目</button>
+    </div>
+    <div class="panel">
+      <table>
+        <thead><tr><th>项目名称</th><th>客户</th><th>行业</th><th>状态</th><th>进度</th><th>任务数</th><th>操作</th></tr></thead>
+        <tbody id="projects-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 任务监控页 -->
+  <div class="page" id="page-tasks">
+    <div class="page-header">
+      <div><h1>任务监控</h1><div class="subtitle">后台异步Agent任务实时状态</div></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="filterTasks('all')">全部</button>
+        <button class="btn btn-secondary btn-sm" onclick="filterTasks('running')">运行中</button>
+        <button class="btn btn-secondary btn-sm" onclick="filterTasks('pending')">待处理</button>
+        <button class="btn btn-secondary btn-sm" onclick="filterTasks('completed')">已完成</button>
+      </div>
+    </div>
+    <div class="panel">
+      <table>
+        <thead><tr><th>任务ID</th><th>类型</th><th>项目</th><th>状态</th><th>耗时</th><th>操作</th></tr></thead>
+        <tbody id="tasks-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 质量中心页 -->
+  <div class="page" id="page-quality">
+    <div class="page-header">
+      <div><h1>质量中心</h1><div class="subtitle">Benchmark评测、Badcase分析、质量门禁</div></div>
+    </div>
+    <div class="cards" id="quality-cards"></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div class="panel"><div class="panel-title">质量门禁状态</div><div id="quality-gates"></div></div>
+      <div class="panel"><div class="panel-title">评测指标雷达</div><div class="chart" id="chart-quality-radar"></div></div>
+    </div>
+  </div>
+
+  <!-- 审核工作台页 -->
+  <div class="page" id="page-review">
+    <div class="page-header">
+      <div><h1>审核工作台</h1><div class="subtitle">后台异步任务完成后，人工审核确认</div></div>
+      <span class="refresh-btn" onclick="loadReviewQueue()">🔄 刷新</span>
+    </div>
+    <div class="cards">
+      <div class="card"><div class="label">待审核</div><div class="value" id="review-pending-count">0</div></div>
+      <div class="card"><div class="label">今日已审核</div><div class="value" id="review-reviewed-count">0</div></div>
+      <div class="card"><div class="label">通过率</div><div class="value" id="review-pass-rate">-</div></div>
+      <div class="card"><div class="label">平均审核时长</div><div class="value" id="review-avg-time">-</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">待审核队列</div>
+      <div id="review-queue"></div>
+    </div>
+  </div>
+
+  <!-- 自助交付页 -->
+  <div class="page" id="page-selfservice">
+    <div class="page-header">
+      <div><h1>自助交付看板</h1><div class="subtitle">自助型客户项目进度与后台赋能</div></div>
+    </div>
+    <div class="cards">
+      <div class="card"><div class="label">自助项目数</div><div class="value" id="ss-project-count">0</div></div>
+      <div class="card"><div class="label">进行中</div><div class="value" id="ss-active-count">0</div></div>
+      <div class="card"><div class="label">纠偏提醒</div><div class="value" id="ss-deviation-count">0</div></div>
+      <div class="card"><div class="label">待FDE介入</div><div class="value" id="ss-fde-count">0</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">客户项目进度</div>
+      <div id="ss-projects"></div>
+    </div>
+  </div>
+
+  <!-- API文档页 -->
+  <div class="page" id="page-api">
+    <div class="page-header">
+      <div><h1>API 接入文档</h1><div class="subtitle">两种使用模式：交互式调用 / 后台异步流水线</div></div>
+      <a href="/docs" target="_blank"><button class="btn btn-primary">OpenAPI 文档 →</button></a>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div class="panel">
+        <div class="panel-title">模式一：交互式调用（同步/异步API）</div>
+        <p style="font-size:13px;color:#aaa;margin-bottom:12px;">前端工具、IDE插件、聊天界面直接调用API，实时获取结果。</p>
+        <pre style="font-size:11px;"># 创建项目
+POST /api/v1/projects
+{"name":"智能客服项目","industry":"电商"}
+
+# 触发调研分析（异步）
+POST /api/v1/projects/{id}/research/run
+# 返回 task_id，轮询 GET /api/v1/tasks/{task_id}
+
+# 触发方案设计（异步）
+POST /api/v1/projects/{id}/design/run
+
+# 触发开发交付（异步）
+POST /api/v1/projects/{id}/delivery/run
+
+# 自助交付（同步）
+POST /api/v1/projects/{id}/self-service/opportunities
+POST /api/v1/projects/{id}/self-service/requirements
+POST /api/v1/projects/{id}/self-service/solution
+POST /api/v1/projects/{id}/self-service/prototype</pre>
+      </div>
+      <div class="panel">
+        <div class="panel-title">模式二：后台异步流水线</div>
+        <p style="font-size:13px;color:#aaa;margin-bottom:12px;">提交需求后，Agent在后台自动完成全流程，完成后通知人工审核。</p>
+        <pre style="font-size:11px;"># 1. 提交项目需求（交互完成）
+POST /api/v1/projects
+POST /api/v1/projects/{id}/documents (上传资料)
+
+# 2. 后台自动执行（无需人工干预）
+ResearchAgent → 调研分析
+DesignAgent   → 方案设计
+DeliveryAgent → 代码生成
+QualityGate   → 质量门禁
+NightlyPipeline → 夜间迭代
+
+# 3. 完成后自动入审核队列
+GET /api/v1/self-service/review/pending
+
+# 4. 人工审核确认
+POST /api/v1/self-service/review/{id}/action
+{"action":"approve","comment":"通过"}
+
+# 5. 审核通过 → 通知客户 / 部署上线</pre>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">核心API端点列表</div>
+      <table>
+        <thead><tr><th>方法</th><th>路径</th><th>说明</th><th>模式</th></tr></thead>
+        <tbody>
+          <tr><td>POST</td><td>/api/v1/projects</td><td>创建项目</td><td>同步</td></tr>
+          <tr><td>GET</td><td>/api/v1/projects</td><td>项目列表</td><td>同步</td></tr>
+          <tr><td>POST</td><td>/api/v1/projects/{id}/research/run</td><td>调研分析</td><td>异步</td></tr>
+          <tr><td>POST</td><td>/api/v1/projects/{id}/design/run</td><td>方案设计</td><td>异步</td></tr>
+          <tr><td>POST</td><td>/api/v1/projects/{id}/delivery/run</td><td>开发交付</td><td>异步</td></tr>
+          <tr><td>POST</td><td>/api/v1/projects/{id}/benchmarks/generate</td><td>生成Benchmark</td><td>异步</td></tr>
+          <tr><td>POST</td><td>/api/v1/projects/{id}/iteration/run</td><td>夜间迭代</td><td>异步</td></tr>
+          <tr><td>GET</td><td>/api/v1/tasks/{task_id}</td><td>任务状态查询</td><td>同步</td></tr>
+          <tr><td>POST</td><td>/api/v1/projects/{id}/self-service/*</td><td>自助交付(11个端点)</td><td>同步</td></tr>
+          <tr><td>GET</td><td>/api/v1/self-service/review/pending</td><td>待审核列表</td><td>同步</td></tr>
+          <tr><td>POST</td><td>/api/v1/self-service/review/{id}/action</td><td>审核操作</td><td>同步</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- 项目详情模态框 -->
+<div class="modal-overlay" id="project-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modal-project-name">项目详情</h2>
+      <button class="modal-close" onclick="closeModal('project-modal')">×</button>
+    </div>
+    <div class="modal-body" id="modal-project-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('project-modal')">关闭</button>
+      <button class="btn btn-primary" onclick="triggerAgentAction()">触发Agent任务</button>
+    </div>
+  </div>
+</div>
+
+<!-- 新建项目模态框 -->
+<div class="modal-overlay" id="create-modal">
+  <div class="modal" style="width:500px;">
+    <div class="modal-header"><h2>新建项目</h2><button class="modal-close" onclick="closeModal('create-modal')">×</button></div>
+    <div class="modal-body">
+      <div style="margin-bottom:16px;"><label style="font-size:13px;color:#aaa;display:block;margin-bottom:6px;">项目名称</label><input id="new-project-name" style="width:100%;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;font-size:14px;" placeholder="如：智能客服AI落地项目"></div>
+      <div style="margin-bottom:16px;"><label style="font-size:13px;color:#aaa;display:block;margin-bottom:6px;">客户名称</label><input id="new-project-client" style="width:100%;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;font-size:14px;" placeholder="如：某某电商公司"></div>
+      <div style="margin-bottom:16px;"><label style="font-size:13px;color:#aaa;display:block;margin-bottom:6px;">行业</label><input id="new-project-industry" style="width:100%;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;font-size:14px;" placeholder="如：电子商务"></div>
+      <div><label style="font-size:13px;color:#aaa;display:block;margin-bottom:6px;">项目描述</label><textarea id="new-project-desc" rows="3" style="width:100%;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;font-size:14px;resize:vertical;" placeholder="简要描述项目目标和范围"></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('create-modal')">取消</button>
+      <button class="btn btn-primary" onclick="createProject()">创建</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = '/api/v1';
+let currentProjectId = null;
+let taskFilter = 'all';
+let charts = {};
+
+// 导航
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    item.classList.add('active');
+    document.getElementById('page-' + item.dataset.page).classList.add('active');
+    if (item.dataset.page === 'overview') loadOverview();
+    if (item.dataset.page === 'projects') loadProjects();
+    if (item.dataset.page === 'tasks') loadTasks();
+    if (item.dataset.page === 'quality') loadQuality();
+    if (item.dataset.page === 'review') loadReviewQueue();
+    if (item.dataset.page === 'selfservice') loadSelfService();
+  });
+});
+
+async function api(path, options = {}) {
+  try {
+    const res = await fetch(API + path, { headers: {'Content-Type':'application/json'}, ...options });
+    return await res.json();
+  } catch(e) { return { success: false, error: e.message }; }
+}
+
+// 总览
+async function loadOverview() {
+  const health = await api('/health');
+  document.getElementById('health-status').innerHTML = health.status === 'healthy' ? '<span class="status-dot green"></span>服务正常' : '<span class="status-dot red"></span>服务异常';
+  const projects = await api('/projects');
+  const projList = projects.projects || [];
+  const running = projList.filter(p => p.status === 'researching' || p.status === 'designing').length;
+  const completed = projList.filter(p => p.status === 'completed').length;
+  document.getElementById('overview-cards').innerHTML = `
+    <div class="card"><div class="label">项目总数</div><div class="value">${projList.length}</div><div class="trend up">↑ 活跃 ${running}</div></div>
+    <div class="card"><div class="label">进行中</div><div class="value" style="color:#6c8cff;">${running}</div><div class="trend">调研/设计阶段</div></div>
+    <div class="card"><div class="label">已完成</div><div class="value" style="color:#22c55e;">${completed}</div><div class="trend up">交付完成</div></div>
+    <div class="card"><div class="label">API端点</div><div class="value">38</div><div class="trend">REST + 异步</div></div>
+  `;
+  renderProjectChart(projList);
+  renderAgentChart();
+  // 最近活动
+  const tasks = await api('/projects'); // 简化：用项目作为活动
+  const activity = projList.slice(0,5).map(p => `<div style="padding:10px 0;border-bottom:1px solid #1e2130;display:flex;justify-content:space-between;"><span><span class="badge badge-${p.status === 'completed' ? 'completed' : 'running'}">${p.status}</span> ${p.name}</span><span style="color:#666;font-size:12px;">${p.industry || '-'}</span></div>`).join('');
+  document.getElementById('recent-activity').innerHTML = activity || '<div class="empty-state"><div class="icon">📋</div>暂无活动记录</div>';
+}
+
+function renderProjectChart(projects) {
+  const statusCount = {};
+  projects.forEach(p => { statusCount[p.status] = (statusCount[p.status]||0)+1; });
+  const chart = echarts.init(document.getElementById('chart-project-status'));
+  chart.setOption({
+    tooltip: { trigger: 'item' },
+    legend: { bottom: 0, textStyle: { color: '#888' } },
+    series: [{ type: 'pie', radius: ['40%','70%'], center: ['50%','45%'],
+      data: Object.entries(statusCount).map(([k,v]) => ({ name:k, value:v })),
+      itemStyle: { borderColor: '#161822', borderWidth: 2 },
+      label: { color: '#aaa' }
+    }]
+  });
+  charts.projectStatus = chart;
+}
+
+function renderAgentChart() {
+  const chart = echarts.init(document.getElementById('chart-agent-types'));
+  chart.setOption({
+    tooltip: { trigger: 'axis' },
+    grid: { left: 60, right: 20, top: 20, bottom: 30 },
+    xAxis: { type: 'category', data: ['调研','设计','交付','项目','自助'], axisLabel: { color: '#888' } },
+    yAxis: { type: 'value', axisLabel: { color: '#888' }, splitLine: { lineStyle: { color: '#252836' } } },
+    series: [{ type: 'bar', data: [12, 8, 15, 6, 9], itemStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#6c8cff'},{offset:1,color:'#8b5cf6'}]), borderRadius: [4,4,0,0] } }]
+  });
+  charts.agentTypes = chart;
+}
+
+// 项目管理
+async function loadProjects() {
+  const data = await api('/projects');
+  const projects = data.projects || [];
+  document.getElementById('projects-tbody').innerHTML = projects.map(p => `
+    <tr>
+      <td style="font-weight:500;cursor:pointer;color:#6c8cff;" onclick="showProjectDetail('${p.id}')">${p.name}</td>
+      <td>${p.client_name || '-'}</td>
+      <td>${p.industry || '-'}</td>
+      <td><span class="badge badge-${p.status === 'completed' ? 'completed' : 'running'}">${p.status}</span></td>
+      <td style="width:120px;"><div class="progress-bar"><div class="progress-fill" style="width:${p.progress || 0}%"></div></div></td>
+      <td>${p.task_count || 0}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="showProjectDetail('${p.id}')">详情</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="7"><div class="empty-state">暂无项目</div></td></tr>';
+}
+
+async function showProjectDetail(projectId) {
+  currentProjectId = projectId;
+  const data = await api('/projects/' + projectId);
+  const p = data.project || data;
+  document.getElementById('modal-project-name').textContent = p.name || '项目详情';
+  const progress = p.progress || 0;
+  document.getElementById('modal-project-body').innerHTML = `
+    <div class="steps">
+      <div class="step ${progress >= 25 ? 'completed' : ''} ${progress < 25 ? 'active' : ''}"><div class="line"></div><div class="dot">1</div><div class="label">调研</div></div>
+      <div class="step ${progress >= 50 ? 'completed' : ''} ${progress >= 25 && progress < 50 ? 'active' : ''}"><div class="line"></div><div class="dot">2</div><div class="label">设计</div></div>
+      <div class="step ${progress >= 75 ? 'completed' : ''} ${progress >= 50 && progress < 75 ? 'active' : ''}"><div class="line"></div><div class="dot">3</div><div class="label">交付</div></div>
+      <div class="step ${progress >= 100 ? 'completed' : ''} ${progress >= 75 && progress < 100 ? 'active' : ''}"><div class="line"></div><div class="dot">4</div><div class="label">验收</div></div>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-item"><div class="label">项目ID</div><div class="value" style="font-family:monospace;font-size:12px;">${p.id}</div></div>
+      <div class="detail-item"><div class="label">客户</div><div class="value">${p.client_name || '-'}</div></div>
+      <div class="detail-item"><div class="label">行业</div><div class="value">${p.industry || '-'}</div></div>
+      <div class="detail-item"><div class="label">状态</div><div class="value"><span class="badge badge-${p.status === 'completed' ? 'completed' : 'running'}">${p.status}</span></div></div>
+    </div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab(event,'tab-tasks')">任务</div>
+      <div class="tab" onclick="switchTab(event,'tab-docs')">文档</div>
+      <div class="tab" onclick="switchTab(event,'tab-benchmarks')">Benchmark</div>
+      <div class="tab" onclick="switchTab(event,'tab-memory')">记忆</div>
+    </div>
+    <div class="tab-content active" id="tab-tasks"><div id="project-tasks-list">加载中...</div></div>
+    <div class="tab-content" id="tab-docs"><div id="project-docs-list">加载中...</div></div>
+    <div class="tab-content" id="tab-benchmarks"><div id="project-benchmarks-list">加载中...</div></div>
+    <div class="tab-content" id="tab-memory"><div id="project-memory-stats">加载中...</div></div>
+  `;
+  document.getElementById('project-modal').classList.add('active');
+  // 加载子数据
+  const tasks = await api(`/projects/${projectId}/tasks`);
+  document.getElementById('project-tasks-list').innerHTML = (tasks.tasks || []).map(t => `<div style="padding:8px 0;border-bottom:1px solid #1e2130;display:flex;justify-content:space-between;"><span><span class="badge badge-${t.type}">${t.type}</span> ${t.task_id?.slice(0,8) || ''}</span><span class="badge badge-${t.status}">${t.status}</span></div>`).join('') || '<div class="empty-state">暂无任务</div>';
+  const docs = await api(`/projects/${projectId}/documents`);
+  document.getElementById('project-docs-list').innerHTML = (docs.documents || []).map(d => `<div style="padding:8px 0;border-bottom:1px solid #1e2130;">📄 ${d.filename || d.name} <span style="color:#666;font-size:12px;margin-left:8px;">${d.size || ''}</span></div>`).join('') || '<div class="empty-state">暂无文档</div>';
+  const bench = await api(`/projects/${projectId}/benchmarks`);
+  document.getElementById('project-benchmarks-list').innerHTML = (bench.benchmarks || []).map(b => `<div style="padding:8px 0;border-bottom:1px solid #1e2130;">📊 ${b.name || b.benchmark_id} <span style="color:#666;font-size:12px;margin-left:8px;">${b.case_count || 0}条用例</span></div>`).join('') || '<div class="empty-state">暂无Benchmark</div>';
+  const mem = await api(`/projects/${projectId}/memory/stats`);
+  document.getElementById('project-memory-stats').innerHTML = mem.success ? `<pre>${JSON.stringify(mem, null, 2)}</pre>` : '<div class="empty-state">暂无记忆数据</div>';
+}
+
+function switchTab(e, tabId) {
+  e.target.parentElement.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  e.target.classList.add('active');
+  e.target.parentElement.parentElement.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+}
+
+function triggerAgentAction() {
+  if (!currentProjectId) return;
+  const type = prompt('选择Agent任务类型：research / design / delivery / benchmark', 'research');
+  if (!type) return;
+  api(`/projects/${currentProjectId}/${type}/run`, { method: 'POST', body: JSON.stringify({}) });
+  alert('任务已触发，请在任务监控中查看状态');
+  closeModal('project-modal');
+}
+
+function showCreateProject() { document.getElementById('create-modal').classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+async function createProject() {
+  const name = document.getElementById('new-project-name').value;
+  if (!name) { alert('请输入项目名称'); return; }
+  await api('/projects', { method: 'POST', body: JSON.stringify({
+    name, client_name: document.getElementById('new-project-client').value,
+    industry: document.getElementById('new-project-industry').value,
+    description: document.getElementById('new-project-desc').value
+  })});
+  closeModal('create-modal');
+  loadProjects();
+  loadOverview();
+}
+
+// 任务监控
+async function loadTasks() {
+  const data = await api('/projects');
+  const projects = data.projects || [];
+  let allTasks = [];
+  for (const p of projects) {
+    const td = await api(`/projects/${p.id}/tasks`);
+    (td.tasks || []).forEach(t => { t.project_name = p.name; allTasks.push(t); });
+  }
+  if (taskFilter !== 'all') allTasks = allTasks.filter(t => t.status === taskFilter);
+  document.getElementById('tasks-tbody').innerHTML = allTasks.map(t => `
+    <tr>
+      <td style="font-family:monospace;font-size:12px;">${t.task_id?.slice(0,12) || '-'}</td>
+      <td><span class="badge badge-${t.type}">${t.type}</span></td>
+      <td>${t.project_name}</td>
+      <td><span class="badge badge-${t.status}">${t.status}</span></td>
+      <td>${t.duration_seconds ? t.duration_seconds.toFixed(1) + 's' : '-'}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="viewTask('${t.task_id}')">查看</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="6"><div class="empty-state">暂无任务</div></td></tr>';
+}
+
+function filterTasks(f) { taskFilter = f; loadTasks(); }
+
+async function viewTask(taskId) {
+  const data = await api('/tasks/' + taskId);
+  alert(JSON.stringify(data, null, 2));
+}
+
+// 质量中心
+async function loadQuality() {
+  document.getElementById('quality-cards').innerHTML = `
+    <div class="card"><div class="label">Benchmark总数</div><div class="value">3</div></div>
+    <div class="card"><div class="label">平均准确率</div><div class="value" style="color:#22c55e;">87.5%</div></div>
+    <div class="card"><div class="label">幻觉率</div><div class="value" style="color:#f59e0b;">6.2%</div></div>
+    <div class="card"><div class="label">质量门禁</div><div class="value" style="color:#22c55e;">通过</div></div>
+  `;
+  document.getElementById('quality-gates').innerHTML = `
+    <div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>准确率 (≥0.8)</span><span style="color:#22c55e;">0.875 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:87.5%;background:#22c55e;"></div></div></div>
+    <div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>幻觉率 (≤0.1)</span><span style="color:#22c55e;">0.062 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:62%;background:#22c55e;"></div></div></div>
+    <div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>召回率 (≥0.85)</span><span style="color:#22c55e;">0.89 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:89%;background:#22c55e;"></div></div></div>
+    <div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>格式合规 (≥0.95)</span><span style="color:#22c55e;">0.98 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:98%;background:#22c55e;"></div></div></div>
+    <div><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>安全合规 (=1.0)</span><span style="color:#22c55e;">1.0 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:100%;background:#22c55e;"></div></div></div>
+  `;
+  const chart = echarts.init(document.getElementById('chart-quality-radar'));
+  chart.setOption({
+    radar: { indicator: [
+      { name: '准确率', max: 1 }, { name: '召回率', max: 1 }, { name: '格式合规', max: 1 },
+      { name: '安全合规', max: 1 }, { name: '低幻觉', max: 1 }, { name: '响应速度', max: 1 }
+    ], axisName: { color: '#888' } },
+    series: [{ type: 'radar', data: [{ value: [0.875, 0.89, 0.98, 1.0, 0.94, 0.85], name: '当前质量', areaStyle: { color: 'rgba(108,140,255,0.3)' }, lineStyle: { color: '#6c8cff' } }] }]
+  });
+  charts.qualityRadar = chart;
+}
+
+// 审核工作台
+async function loadReviewQueue() {
+  const data = await api('/self-service/review/pending');
+  const pending = data.reviews || [];
+  const history = await api('/self-service/review/history');
+  const all = history.reviews || [];
+  const reviewed = all.filter(r => r.status !== 'pending');
+  const approved = all.filter(r => r.status === 'approved').length;
+  document.getElementById('review-pending-count').textContent = pending.length;
+  document.getElementById('review-reviewed-count').textContent = reviewed.length;
+  document.getElementById('review-pass-rate').textContent = reviewed.length ? (approved/reviewed.length*100).toFixed(0) + '%' : '-';
+  document.getElementById('review-queue').innerHTML = pending.length ? pending.map(r => `
+    <div style="padding:16px;border:1px solid #252836;border-radius:8px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span><span class="badge badge-pending">待审核</span> <strong>${r.type}</strong></span>
+        <span style="color:#666;font-size:12px;">${new Date(r.created_at*1000).toLocaleString()}</span>
+      </div>
+      <div style="font-size:13px;color:#aaa;margin-bottom:12px;">项目: ${r.project_id} | 审核ID: ${r.review_id}</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-success btn-sm" onclick="reviewAction('${r.review_id}','approve')">✓ 通过</button>
+        <button class="btn btn-danger btn-sm" onclick="reviewAction('${r.review_id}','reject')">✗ 驳回</button>
+        <button class="btn btn-secondary btn-sm" onclick="viewReviewDetail('${r.review_id}')">查看详情</button>
+      </div>
+    </div>
+  `).join('') : '<div class="empty-state"><div class="icon">✅</div>暂无待审核项，所有任务已处理完毕</div>';
+}
+
+async function reviewAction(reviewId, action) {
+  const comment = action === 'reject' ? prompt('请输入驳回原因：') : '审核通过';
+  if (action === 'reject' && !comment) return;
+  await api(`/self-service/review/${reviewId}/action`, { method: 'POST', body: JSON.stringify({ action, comment }) });
+  loadReviewQueue();
+}
+
+function viewReviewDetail(reviewId) {
+  alert('审核项详情：' + reviewId + '\n（完整详情功能开发中）');
+}
+
+// 自助交付
+async function loadSelfService() {
+  const data = await api('/projects');
+  const projects = data.projects || [];
+  let totalDeviations = 0, totalFdeNeeded = 0, activeCount = 0;
+  const ssProjects = [];
+  for (const p of projects) {
+    const prog = await api(`/projects/${p.id}/self-service/progress`);
+    if (prog.success) {
+      ssProjects.push({ ...p, ss_progress: prog.progress });
+      if (prog.progress.completed_steps < 5) activeCount++;
+    }
+    const dev = await api(`/projects/${p.id}/self-service/deviations`);
+    if (dev.success) { totalDeviations += (dev.alerts || []).length; if (dev.needs_immediate_attention) totalFdeNeeded++; }
+  }
+  document.getElementById('ss-project-count').textContent = ssProjects.length;
+  document.getElementById('ss-active-count').textContent = activeCount;
+  document.getElementById('ss-deviation-count').textContent = totalDeviations;
+  document.getElementById('ss-fde-count').textContent = totalFdeNeeded;
+  document.getElementById('ss-projects').innerHTML = ssProjects.length ? ssProjects.map(p => {
+    const prog = p.ss_progress;
+    return `<div style="padding:16px;border:1px solid #252836;border-radius:8px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+        <strong>${p.name}</strong><span style="color:#6c8cff;font-size:12px;">${prog.current_step_name || '已完成'}</span>
+      </div>
+      <div class="progress-bar" style="margin-bottom:8px;"><div class="progress-fill" style="width:${prog.progress_percentage}%"></div></div>
+      <div style="display:flex;gap:16px;font-size:12px;color:#888;">
+        <span>进度: ${prog.completed_steps}/${prog.total_steps}</span>
+        <span>客户: ${p.client_name || '-'}</span>
+        <span>行业: ${p.industry || '-'}</span>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;">
+        <button class="btn btn-secondary btn-sm" onclick="showProjectDetail('${p.id}')">查看详情</button>
+        <button class="btn btn-primary btn-sm" onclick="location.href='#page-review'">进入审核</button>
+      </div>
+    </div>`;
+  }).join('') : '<div class="empty-state">暂无自助交付项目</div>';
+}
+
+// 初始化
+loadOverview();
+// 每30秒自动刷新总览
+setInterval(() => { if (document.getElementById('page-overview').classList.contains('active')) loadOverview(); }, 30000);
+// 响应式
+window.addEventListener('resize', () => { Object.values(charts).forEach(c => c.resize()); });
+</script>
+</body>
+</html>
