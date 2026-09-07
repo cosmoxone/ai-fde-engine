@@ -109,6 +109,13 @@ class TestTaskContract:
         assert updated["status"] == "completed"
         assert storage.get_task("t1")["result"]["accuracy"] == 0.9
 
+    def test_update_preserves_project_filter(self, storage):
+        """防回归：更新任务后仍可按 project 过滤（INSERT OR REPLACE 清空附属列的历史bug）"""
+        storage.create_task({"id": "t1", "project_id": "p1", "status": "running"})
+        storage.update_task("t1", {"status": "completed", "result": {"ok": 1}})
+        assert len(storage.list_tasks("p1")) == 1
+        assert len(storage.list_tasks("nope")) == 0
+
     def test_list_by_project(self, storage):
         storage.create_task({"id": "t1", "project_id": "p1", "status": "completed"})
         storage.create_task({"id": "t2", "project_id": "p2", "status": "completed"})

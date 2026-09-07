@@ -76,4 +76,15 @@ print(f\"  版本: {r['version']} | 自动修复: {r['auto_fixed']} | 待人工:
 echo -e "\n==> [7/7] 项目进度"
 curl -sf "$API/projects/$PROJECT_ID/progress" | python3 -m json.tool | head -14
 
-echo -e "\n✅ 演示完成。打开 http://localhost:8000/dashboard 查看控制台与审核工作台。"
+# 8. 导出本次演示交付物摘要到 output/
+OUT="output/demo-$(date +%Y%m%d-%H%M%S)"
+mkdir -p "$OUT"
+curl -sf "$API/projects/$PROJECT_ID" > "$OUT/project.json"
+curl -sf "$API/projects/$PROJECT_ID/progress" > "$OUT/progress.json"
+curl -sf "$API/projects/$PROJECT_ID/benchmarks" > "$OUT/benchmarks.json"
+curl -sf "$API/self-service/review/history" > "$OUT/review-history.json"
+ls "$OUT" | sed 's/^/  📄 /'
+echo "  💡 完整交付物导出（需求基线DOCX/三方案/评测报告）将在 v0.1.2 提供"
+
+echo -e "\n✅ 演示完成。交付物摘要已保存到 $OUT/"
+echo "   控制台: http://localhost:8000/dashboard"

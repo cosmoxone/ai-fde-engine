@@ -116,6 +116,7 @@ make test
 
 ```bash
 # 服务启动后，一键跑通：创建项目→上传文档→调研→Benchmark→夜间迭代
+# 交付物摘要（项目/进度/Benchmark/审核记录）自动导出到 output/ 目录
 bash examples/run_demo.sh
 ```
 

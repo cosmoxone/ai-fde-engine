@@ -97,18 +97,24 @@ class SQLiteStorage(StorageProvider):
         return self._load(row["data"]) if row else None
 
     def _upsert(self, table: str, key_col: str, key: str, entity: dict) -> None:
+        """整行写入（仅用于 create/save；update 走 _update_data 防止附属列被清空）"""
         with self._conn() as conn:
             conn.execute(
                 f"INSERT OR REPLACE INTO {table} ({key_col}, data) VALUES (?, ?)",
                 (key, self._dump(entity)),
             )
 
+    def _update_data(self, table: str, key_col: str, key: str, entity: dict) -> None:
+        """仅更新 data 列，保留其他附属列（project_id/status/created_at 等）"""
+        with self._conn() as conn:
+            conn.execute(f"UPDATE {table} SET data = ? WHERE {key_col} = ?", (self._dump(entity), key))
+
     def _update_fields(self, table: str, key_col: str, key: str, fields: dict) -> Optional[dict]:
         entity = self._get_row(table, key_col, key)
         if entity is None:
             return None
         entity.update(fields)
-        self._upsert(table, key_col, key, entity)
+        self._update_data(table, key_col, key, entity)
         return entity
 
     # ===== 项目 =====
@@ -213,13 +219,8 @@ class SQLiteStorage(StorageProvider):
         entity.update(fields)
         with self._conn() as conn:
             conn.execute(
-                "INSERT OR REPLACE INTO reviews (review_id, project_id, status, data) VALUES (?, ?, ?, ?)",
-                (
-                    review_id,
-                    entity.get("project_id"),
-                    entity.get("status"),
-                    self._dump(entity),
-                ),
+                "UPDATE reviews SET status = ?, data = ? WHERE review_id = ?",
+                (entity.get("status"), self._dump(entity), review_id),
             )
         return entity
 
