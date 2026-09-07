@@ -22,6 +22,7 @@ class MemoryStorage(StorageProvider):
         self._benchmarks: dict[str, dict] = {}
         self._reviews: list[dict] = []
         self._feedback: dict[str, list[dict]] = {}
+        self._badcases: dict[str, dict] = {}
         self._lock = threading.RLock()
 
     # ===== 项目 =====
@@ -138,6 +139,33 @@ class MemoryStorage(StorageProvider):
     def list_feedback(self, project_id: str) -> list[dict]:
         with self._lock:
             return [copy.deepcopy(f) for f in self._feedback.get(project_id, [])]
+
+    # ===== Badcase =====
+    def add_badcase(self, badcase: dict) -> None:
+        with self._lock:
+            self._badcases[badcase["id"]] = copy.deepcopy(badcase)
+
+    def get_badcase(self, badcase_id: str) -> Optional[dict]:
+        with self._lock:
+            bc = self._badcases.get(badcase_id)
+            return copy.deepcopy(bc) if bc else None
+
+    def list_badcases(self, project_id: Optional[str] = None, status: Optional[str] = None) -> list[dict]:
+        with self._lock:
+            bcs = list(self._badcases.values())
+        if project_id is not None:
+            bcs = [b for b in bcs if b.get("project_id") == project_id]
+        if status is not None:
+            bcs = [b for b in bcs if b.get("status") == status]
+        return [copy.deepcopy(b) for b in bcs]
+
+    def update_badcase(self, badcase_id: str, fields: dict) -> Optional[dict]:
+        with self._lock:
+            bc = self._badcases.get(badcase_id)
+            if bc is None:
+                return None
+            bc.update(copy.deepcopy(fields))
+            return copy.deepcopy(bc)
 
     # ===== 统计 =====
     def count_running_tasks(self) -> int:

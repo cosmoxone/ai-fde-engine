@@ -101,7 +101,7 @@ pre { background: #0f1117; border: 1px solid #252836; border-radius: 6px; paddin
 <body>
 
 <div class="sidebar">
-  <div class="logo">AI-FDE Engine<span>v1.0.0 · 交付控制台</span></div>
+  <div class="logo">AI-FDE Engine<span>v0.1.2 · 交付控制台</span></div>
   <div class="nav-item active" data-page="overview"><span class="icon">📊</span><span>总览</span></div>
   <div class="nav-item" data-page="projects"><span class="icon">📁</span><span>项目管理</span></div>
   <div class="nav-item" data-page="tasks"><span class="icon">⚡</span><span>任务监控</span></div>
@@ -183,12 +183,14 @@ pre { background: #0f1117; border: 1px solid #252836; border-radius: 6px; paddin
   <div class="page" id="page-quality">
     <div class="page-header">
       <div><h1>质量中心</h1><div class="subtitle">Benchmark评测、Badcase分析、质量门禁</div></div>
+      <button class="btn btn-primary" onclick="openBadcaseModal()">⚡ 提交 Badcase</button>
     </div>
     <div class="cards" id="quality-cards"></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
       <div class="panel"><div class="panel-title">质量门禁状态</div><div id="quality-gates"></div></div>
       <div class="panel"><div class="panel-title">评测指标雷达</div><div class="chart" id="chart-quality-radar"></div></div>
     </div>
+    <div class="panel" style="margin-top:20px;"><div class="panel-title">Badcase 列表（夜间迭代自动归集处理）</div><div id="badcase-list"><div class="empty-state">选择项目后加载</div></div></div>
   </div>
 
   <!-- 审核工作台页 -->
@@ -335,8 +337,36 @@ POST /api/v1/self-service/review/{id}/action
   </div>
 </div>
 
-<!-- LLM设置弹窗（v0.1.1 A3） -->
-<div class="modal-overlay" id="settings-modal">
+<!-- Badcase快速提交弹窗（v0.1.2 B5） -->
+<div class="modal-overlay" id="badcase-modal">
+  <div class="modal" style="width:520px;">
+    <div class="modal-header"><h2>提交 Badcase</h2><button class="modal-close" onclick="closeModal('badcase-modal')">×</button></div>
+    <div class="modal-body">
+      <div style="margin-bottom:12px;font-size:12px;color:#888;">10 秒提交一条坏例。夜间迭代将自动归因，可自动修复或生成修复建议供您采纳。</div>
+      <div style="margin-bottom:12px;"><label style="font-size:13px;color:#aaa;display:block;margin-bottom:6px;">项目</label>
+        <select id="badcase-project" style="width:100%;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;font-size:14px;"></select></div>
+      <div style="margin-bottom:12px;"><label style="font-size:13px;color:#aaa;display:block;margin-bottom:6px;">用户输入</label>
+        <input id="badcase-input" style="width:100%;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;font-size:14px;" placeholder="客户/用户实际问了什么"></div>
+      <div style="margin-bottom:12px;"><label style="font-size:13px;color:#aaa;display:block;margin-bottom:6px;">实际输出（错误）</label>
+        <input id="badcase-actual" style="width:100%;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;font-size:14px;" placeholder="系统答错了什么"></div>
+      <div style="margin-bottom:12px;"><label style="font-size:13px;color:#aaa;display:block;margin-bottom:6px;">期望输出</label>
+        <input id="badcase-expected" style="width:100%;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;font-size:14px;" placeholder="正确答案应该是什么"></div>
+      <div style="margin-bottom:8px;"><label style="font-size:13px;color:#aaa;display:block;margin-bottom:6px;">错误类型</label>
+        <select id="badcase-type" style="width:100%;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;font-size:14px;">
+          <option value="knowledge">知识缺失（该答的没答上）</option>
+          <option value="prompt">格式/表述问题</option>
+          <option value="rule">业务规则冲突</option>
+          <option value="model_boundary">模型能力边界</option>
+        </select></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('badcase-modal')">取消</button>
+      <button class="btn btn-primary" onclick="submitBadcase()">提交</button>
+    </div>
+  </div>
+</div>
+
+<!-- LLM设置弹窗（v0.1.1 A3） --><div class="modal-overlay" id="settings-modal">
   <div class="modal" style="width:480px;">
     <div class="modal-header"><h2>LLM 配置</h2><button class="modal-close" onclick="closeModal('settings-modal')">×</button></div>
     <div class="modal-body">
@@ -364,6 +394,59 @@ const API = '/api/v1';
 let currentProjectId = null;
 let taskFilter = 'all';
 let charts = {};
+
+// ===== 交付物导出（v0.1.2 B1）=====
+function exportDeliverables(projectId, fmt) {
+  window.open(`${API}/projects/${projectId}/export?format=${fmt}`, '_blank');
+}
+
+// ===== Badcase快速提交（v0.1.2 B5）=====
+async function openBadcaseModal() {
+  try {
+    const data = await api('/projects');
+    const sel = document.getElementById('badcase-project');
+    sel.innerHTML = (data.projects || []).map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+    if (currentProjectId) sel.value = currentProjectId;
+  } catch (e) { /* ignore */ }
+  document.getElementById('badcase-modal').classList.add('active');
+  loadBadcaseList();
+}
+
+async function submitBadcase() {
+  const projectId = document.getElementById('badcase-project').value;
+  const input = document.getElementById('badcase-input').value.trim();
+  const actual = document.getElementById('badcase-actual').value.trim();
+  const expected = document.getElementById('badcase-expected').value.trim();
+  const error_type = document.getElementById('badcase-type').value;
+  if (!projectId || !input) { alert('请选择项目并填写用户输入'); return; }
+  try {
+    const data = await api(`/projects/${projectId}/badcases`, {
+      method: 'POST',
+      body: JSON.stringify({ input, actual_output: actual, expected_output: expected, error_type, severity: 'medium' })
+    });
+    if (data.success) {
+      alert('✅ 已提交，夜间迭代将自动处理');
+      ['badcase-input', 'badcase-actual', 'badcase-expected'].forEach(id => document.getElementById(id).value = '');
+      closeModal('badcase-modal');
+      loadBadcaseList();
+    }
+  } catch (e) { alert('提交失败：' + e.message); }
+}
+
+async function loadBadcaseList() {
+  const pid = document.getElementById('badcase-project')?.value || currentProjectId;
+  if (!pid) return;
+  try {
+    const data = await api(`/projects/${pid}/badcases`);
+    const el = document.getElementById('badcase-list');
+    el.innerHTML = (data.badcases || []).length
+      ? data.badcases.map(b => `<div style="padding:8px 0;border-bottom:1px solid #1e2130;font-size:13px;">
+          <span class="badge badge-${b.status === 'open' ? 'running' : 'completed'}">${b.status === 'open' ? '待处理' : '已处理'}</span>
+          <b style="margin:0 8px;">[${b.error_type || '-'}]</b>${(b.input || '').slice(0, 60)}
+        </div>`).join('')
+      : '<div class="empty-state">暂无 Badcase</div>';
+  } catch (e) { /* ignore */ }
+}
 
 // ===== LLM 配置（v0.1.1 A3）=====
 async function checkLLMStatus() {

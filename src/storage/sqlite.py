@@ -48,6 +48,13 @@ CREATE TABLE IF NOT EXISTS reviews (
     status TEXT,
     data TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS badcases (
+    id TEXT PRIMARY KEY,
+    project_id TEXT,
+    status TEXT,
+    data TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_badcases_project ON badcases(project_id);
 CREATE TABLE IF NOT EXISTS feedback (
     seq INTEGER PRIMARY KEY AUTOINCREMENT,
     project_id TEXT NOT NULL,
@@ -239,6 +246,44 @@ class SQLiteStorage(StorageProvider):
                 (project_id,),
             ).fetchall()
         return [self._load(r["data"]) for r in rows]
+
+    # ===== Badcase =====
+    def add_badcase(self, badcase: dict) -> None:
+        with self._conn() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO badcases (id, project_id, status, data) VALUES (?, ?, ?, ?)",
+                (badcase["id"], badcase.get("project_id"), badcase.get("status"), self._dump(badcase)),
+            )
+
+    def get_badcase(self, badcase_id: str) -> Optional[dict]:
+        return self._get_row("badcases", "id", badcase_id)
+
+    def list_badcases(self, project_id: Optional[str] = None, status: Optional[str] = None) -> list[dict]:
+        with self._conn() as conn:
+            if project_id is None and status is None:
+                rows = conn.execute("SELECT data FROM badcases").fetchall()
+            else:
+                conds, params = [], []
+                if project_id is not None:
+                    conds.append("project_id = ?")
+                    params.append(project_id)
+                if status is not None:
+                    conds.append("status = ?")
+                    params.append(status)
+                rows = conn.execute(f"SELECT data FROM badcases WHERE {' AND '.join(conds)}", params).fetchall()
+        return [self._load(r["data"]) for r in rows]
+
+    def update_badcase(self, badcase_id: str, fields: dict) -> Optional[dict]:
+        entity = self._get_row("badcases", "id", badcase_id)
+        if entity is None:
+            return None
+        entity.update(fields)
+        with self._conn() as conn:
+            conn.execute(
+                "UPDATE badcases SET status = ?, data = ? WHERE id = ?",
+                (entity.get("status"), self._dump(entity), badcase_id),
+            )
+        return entity
 
     # ===== 统计 =====
     def count_running_tasks(self) -> int:

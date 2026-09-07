@@ -656,8 +656,15 @@ async def run_iteration(project_id: str, req: IterationRun, background_tasks: Ba
 
     async def do_iteration():
         try:
+            storage = get_storage()
+            badcases = req.badcases
+            if not badcases:
+                # v0.1.2 B5：自动归集本项目未处理badcase
+                badcases = storage.list_badcases(project_id, status="open")
             pipeline = NightlyIterationPipeline(project_id)
-            result = await pipeline.run(req.badcases, req.benchmark_cases)
+            result = await pipeline.run(badcases, req.benchmark_cases)
+            for bc in badcases:
+                storage.update_badcase(bc.get("id", ""), {"status": "processed", "processed_version": result.version})
             get_storage().update_task(
                 task_id,
                 {
@@ -665,12 +672,14 @@ async def run_iteration(project_id: str, req: IterationRun, background_tasks: Ba
                     "result": {
                         "success": result.success,
                         "version": result.version,
+                        "badcases_processed": result.badcases_processed,
                         "auto_fixed": result.auto_fixed,
                         "need_human": result.need_human,
                         "regression_accuracy": result.regression_accuracy,
                         "gate_passed": result.gate_passed,
                         "deployed": result.deployed,
                         "rolled_back": result.rolled_back,
+                        "fix_suggestions": result.fix_suggestions,
                         "duration_seconds": result.duration_seconds,
                         "report": result.report,
                     },
@@ -700,6 +709,7 @@ async def add_badcase(project_id: str, req: BadcaseFeedback):
         "status": "open",
         "created_at": __import__("time").time(),
     }
+    get_storage().add_badcase(badcase)  # v0.1.2 B5：badcase持久化，夜间迭代自动归集
     # 记录到记忆
     memory = get_memory_manager(project_id)
     await memory.remember(
@@ -708,6 +718,15 @@ async def add_badcase(project_id: str, req: BadcaseFeedback):
         importance=0.7,
     )
     return {"success": True, "badcase": badcase}
+
+
+@app.get("/api/v1/projects/{project_id}/badcases")
+async def list_badcases(project_id: str, status: Optional[str] = None):
+    """Badcase列表（v0.1.2 B5，可按状态过滤）"""
+    if get_storage().get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    bcs = get_storage().list_badcases(project_id, status=status)
+    return {"success": True, "badcases": bcs, "total": len(bcs)}
 
 
 # ===== 记忆检索 =====

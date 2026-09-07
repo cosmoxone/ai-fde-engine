@@ -33,6 +33,7 @@ class IterationResult:
     steps: list[dict] = field(default_factory=list)
     report: str = ""
     pending_issues: list[dict] = field(default_factory=list)
+    fix_suggestions: list[dict] = field(default_factory=list)
 
 
 class NightlyIterationPipeline:
@@ -83,6 +84,8 @@ class NightlyIterationPipeline:
         result.pending_issues = [
             r for r in fix_result.structured_output.get("results", []) if r.get("fix") == "need_human_review"
         ]
+        # v0.1.2 B5：待人工badcase的修复建议（Prompt补丁/规则确认草稿）
+        result.fix_suggestions = [r["suggestion"] for r in result.pending_issues if r.get("suggestion")]
         result.steps.append(
             {
                 "step": "attribution_and_fix",
@@ -185,6 +188,11 @@ class NightlyIterationPipeline:
                 report += f"版本{step['version']}"
             report += "\n"
 
+        if result.fix_suggestions:
+            report += f"\n## 修复建议（{len(result.fix_suggestions)}条，供采纳）\n"
+            for idx, sug in enumerate(result.fix_suggestions[:5], 1):
+                report += f"\n### 建议{idx}：{sug.get('action', '')}（责任人：{sug.get('owner', 'FDE')}）\n"
+                report += f"- 类型：{sug.get('type', '')}\n- {sug.get('draft', '')[:300]}\n"
         if result.pending_issues:
             report += f"\n## 待人工处理问题 ({len(result.pending_issues)}个)\n"
             for issue in result.pending_issues[:5]:

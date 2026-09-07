@@ -109,6 +109,23 @@ class StorageProvider(ABC):
     def list_feedback(self, project_id: str) -> list[dict]:
         """列出项目全部反馈（按时间顺序）"""
 
+    # ===== Badcase（v0.1.2 B5）=====
+    @abstractmethod
+    def add_badcase(self, badcase: dict) -> None:
+        """保存 Badcase（badcase["id"] 为主键，status: open/processed）"""
+
+    @abstractmethod
+    def get_badcase(self, badcase_id: str) -> Optional[dict]:
+        """获取 Badcase"""
+
+    @abstractmethod
+    def list_badcases(self, project_id: Optional[str] = None, status: Optional[str] = None) -> list[dict]:
+        """列出 Badcase，可按项目/状态过滤"""
+
+    @abstractmethod
+    def update_badcase(self, badcase_id: str, fields: dict) -> Optional[dict]:
+        """更新 Badcase（status/error_type 等）"""
+
     # ===== 统计 =====
     @abstractmethod
     def count_running_tasks(self) -> int:

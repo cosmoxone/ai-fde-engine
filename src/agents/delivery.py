@@ -188,7 +188,16 @@ async def health():
                 results.append({"badcase_id": bc.get("id"), "attribution": attribution, "fix": fix_result})
                 fixed_count += 1
             else:
-                results.append({"badcase_id": bc.get("id"), "attribution": attribution, "fix": "need_human_review"})
+                # v0.1.2 B5：需人工的badcase输出修复建议（而非仅标记），供FDE晨间review采纳
+                suggestion = self._suggest_fix(bc, attribution)
+                results.append(
+                    {
+                        "badcase_id": bc.get("id"),
+                        "attribution": attribution,
+                        "fix": "need_human_review",
+                        "suggestion": suggestion,
+                    }
+                )
                 need_human_count += 1
 
         return AgentResult(
@@ -233,6 +242,44 @@ async def health():
                 "reason": "模型能力边界，无法自动修复",
                 "fix_strategy": "标记为已知限制",
             }
+
+    def _suggest_fix(self, badcase: dict, attribution: dict) -> dict:
+        """
+        生成人工修复建议（v0.1.2 B5）
+        归因类型 → 建议动作 + 草稿（Prompt补丁/规则确认/知识补充清单）
+        """
+        attr_type = attribution.get("type", "")
+        input_text = (badcase.get("input", "") or "")[:120]
+        expected = (badcase.get("expected_output", "") or "")[:120]
+        actual = (badcase.get("actual_output", "") or "")[:120]
+
+        if attr_type == "rule":
+            return {
+                "type": "rule_confirmation",
+                "action": "业务规则确认",
+                "owner": "客户业务专家 + FDE",
+                "draft": (
+                    f"检测到业务规则冲突：输入「{input_text}」期望「{expected}」实际「{actual}」。\n"
+                    f"建议：与业务方确认唯一口径后，更新知识库条目并在Prompt中加入明确规则：「当遇到类似情形时，应……」"
+                ),
+            }
+        if attr_type == "model_boundary":
+            return {
+                "type": "known_limitation",
+                "action": "标记已知限制 + 拒答话术",
+                "owner": "FDE",
+                "draft": (
+                    f"该问题超出当前模型能力边界：「{input_text}」。\n"
+                    f"建议：补充标准拒答/转人工话术「该问题需要专业人员处理，已为您转接……」，"
+                    f"并加入Benchmark边界用例防回归。"
+                ),
+            }
+        return {
+            "type": "manual_review",
+            "action": "人工分析",
+            "owner": "FDE",
+            "draft": f"输入「{input_text}」期望「{expected}」实际「{actual}」。归因：{attribution.get('reason', '')}。建议人工分析后选择修复路径。",
+        }
 
     async def _apply_fix(self, badcase: dict, attribution: dict) -> dict:
         """应用自动修复"""
