@@ -2,6 +2,8 @@
 
 > AI驱动的FDE（Forward Deployed Engineer）交付引擎 —— 用AI重构AI落地本身的生产方式
 
+> **中文** | [English](README.en.md)
+
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
@@ -364,8 +366,22 @@ docker compose -f docker-compose.full.yml restart ai-fde-app
 1. Fork 项目
 2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
 3. 提交更改（遵循 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/)）
-4. 确保 `make lint` 与 `make test`（444 个测试）通过
+4. 确保 `make lint` 与 `make test`（450 个测试）通过
 5. 推送分支并开启 Pull Request
+
+### 特别欢迎的贡献方向
+
+| 方向 | 说明 | Issue 标签 |
+| ---- | ---- | ---- |
+| **行业模板包** | 复制 `src/templates/packs/*.json` 新增行业（医疗/法律/零售…）：行业上下文+需求模板+Benchmark 种子 | `template` |
+| **黄金集标注** | 在 `src/evaluation/golden.py` 补充你所在行业的脱敏真实样本要点 | `golden-set` |
+| **文档与翻译** | 英文文档改进、术语表 | `documentation` |
+| **新手任务** | Issue 区 `good first issue` 标签 | `good first issue` |
+
+### 社区
+
+- 💬 [GitHub Discussions](https://github.com/cosmoxone/ai-fde-engine/discussions)：提问交流、**Show your delivery**（展示真实交付案例）
+- 🐛 [Issues](https://github.com/cosmoxone/ai-fde-engine/issues)：缺陷报告与功能建议
 
 ## 许可证
 
