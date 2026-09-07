@@ -614,11 +614,13 @@ async function showProjectDetail(projectId) {  currentProjectId = projectId;
       <div class="tab" onclick="switchTab(event,'tab-docs')">文档</div>
       <div class="tab" onclick="switchTab(event,'tab-benchmarks')">Benchmark</div>
       <div class="tab" onclick="switchTab(event,'tab-memory')">记忆</div>
+      <div class="tab" onclick="switchTab(event,'tab-req')">需求基线 ✏️</div>
     </div>
     <div class="tab-content active" id="tab-tasks"><div id="project-tasks-list">加载中...</div></div>
     <div class="tab-content" id="tab-docs"><div id="project-docs-list">加载中...</div></div>
     <div class="tab-content" id="tab-benchmarks"><div id="project-benchmarks-list">加载中...</div></div>
     <div class="tab-content" id="tab-memory"><div id="project-memory-stats">加载中...</div></div>
+    <div class="tab-content" id="tab-req"><div id="project-req-list">加载中...</div></div>
   `;
   document.getElementById('project-modal').classList.add('active');
   // 加载子数据
@@ -630,6 +632,49 @@ async function showProjectDetail(projectId) {  currentProjectId = projectId;
   document.getElementById('project-benchmarks-list').innerHTML = (bench.benchmarks || []).map(b => `<div style="padding:8px 0;border-bottom:1px solid #1e2130;">📊 ${b.name || b.benchmark_id} <span style="color:#666;font-size:12px;margin-left:8px;">${b.case_count || 0}条用例</span></div>`).join('') || '<div class="empty-state">暂无Benchmark</div>';
   const mem = await api(`/projects/${projectId}/memory/stats`);
   document.getElementById('project-memory-stats').innerHTML = mem.success ? `<pre>${JSON.stringify(mem, null, 2)}</pre>` : '<div class="empty-state">暂无记忆数据</div>';
+  loadRequirementsTab(projectId, p);
+}
+
+// ===== 可编辑确认流（v0.1.3 B4）=====
+async function loadRequirementsTab(projectId, p) {
+  const el = document.getElementById('project-req-list');
+  const baseline = p.requirements_baseline;
+  if (!baseline || !baseline.requirements || !baseline.requirements.functional?.length) {
+    el.innerHTML = '<div class="empty-state">尚无需求基线：先在项目页触发「调研分析」生成</div>';
+    return;
+  }
+  el.innerHTML = baseline.requirements.functional.map(r => `
+    <div style="padding:10px 0;border-bottom:1px solid #1e2130;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div style="flex:1;">
+          <span class="badge badge-${r.priority === 'P0' ? 'running' : 'completed'}">${r.id} · ${r.priority}</span>
+          <b style="margin-left:8px;" id="req-title-${r.id}">${r.title}</b>
+          <div style="color:#999;font-size:12px;margin-top:4px;" id="req-desc-${r.id}">${r.description || ''}</div>
+          <div style="color:#7ca87c;font-size:12px;margin-top:2px;">✅ 验收：${r.acceptance_criteria || '-'}</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="editRequirement('${projectId}','${r.id}')">✏️ 编辑</button>
+      </div>
+    </div>`).join('');
+}
+
+async function editRequirement(projectId, reqId) {
+  const p = (await api('/projects/' + projectId)).project || {};
+  const r = (p.requirements_baseline?.requirements?.functional || []).find(x => x.id === reqId);
+  if (!r) return;
+  const title = prompt('需求标题：', r.title); if (title === null) return;
+  const acceptance = prompt('验收标准（量化）：', r.acceptance_criteria || ''); if (acceptance === null) return;
+  const description = prompt('需求描述：', r.description || ''); if (description === null) return;
+  const priority = prompt('优先级 P0/P1/P2：', r.priority || 'P1') || 'P1';
+  try {
+    const data = await api(`/projects/${projectId}/requirements/${reqId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ title, acceptance_criteria: acceptance, description, priority })
+    });
+    if (data.success) {
+      alert('✅ 修改已进入基线（导出交付物将包含最新内容）');
+      showProjectDetail(projectId);
+    }
+  } catch (e) { alert('保存失败：' + e.message); }
 }
 
 function switchTab(e, tabId) {

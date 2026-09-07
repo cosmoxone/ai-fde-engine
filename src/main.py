@@ -151,6 +151,24 @@ class OpportunityIdentifyRequest(BaseModel):
     pain_points: Optional[list[str]] = []
 
 
+class RequirementEditRequest(BaseModel):
+    """需求项编辑请求（v0.1.3 B4 可编辑确认流）"""
+
+    title: Optional[str] = None
+    description: Optional[str] = None
+    priority: Optional[str] = None
+    acceptance_criteria: Optional[str] = None
+
+
+class FeatureEditRequest(BaseModel):
+    """产品功能项编辑请求（v0.1.3 B4）"""
+
+    name: Optional[str] = None
+    module: Optional[str] = None
+    description: Optional[str] = None
+    priority: Optional[str] = None
+
+
 class RequirementGuideRequest(BaseModel):
     action: str = "generate_draft"  # generate_draft/confirm/modify/add
     requirement_draft: Optional[dict] = None
@@ -718,6 +736,63 @@ async def add_badcase(project_id: str, req: BadcaseFeedback):
         importance=0.7,
     )
     return {"success": True, "badcase": badcase}
+
+
+# ===== 可编辑确认流（v0.1.3 B4）=====
+
+
+@app.patch("/api/v1/projects/{project_id}/requirements/{req_id}")
+async def edit_requirement(project_id: str, req_id: str, req: RequirementEditRequest):
+    """
+    编辑需求基线中的单个功能需求项（FDE 修改 AI 产出后再确认）。
+    修改直接进入基线，导出交付物即包含修改后内容。
+    """
+    storage = get_storage()
+    project = storage.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    baseline = project.get("requirements_baseline") or {}
+    functional = (baseline.get("requirements") or {}).get("functional") or []
+    target = next((r for r in functional if r.get("id") == req_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail=f"需求项不存在: {req_id}")
+
+    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    if updates.get("priority") and updates["priority"] not in ("P0", "P1", "P2"):
+        raise HTTPException(status_code=400, detail="priority 仅支持 P0/P1/P2")
+    target.update(updates)
+
+    storage.update_project(project_id, {"requirements_baseline": baseline})
+    # 记录修改轨迹（记忆）
+    memory = get_memory_manager(project_id)
+    await memory.remember(
+        content=f"需求项 {req_id} 已人工修改：{list(updates.keys())}",
+        memory_type="event",
+        importance=0.6,
+    )
+    return {"success": True, "requirement": target, "message": "修改已进入基线，导出交付物将包含最新内容"}
+
+
+@app.patch("/api/v1/projects/{project_id}/solutions/features/{feature_id}")
+async def edit_solution_feature(project_id: str, feature_id: str, req: FeatureEditRequest):
+    """编辑产品方案中的单个功能项（v0.1.3 B4）"""
+    storage = get_storage()
+    project = storage.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    solutions = project.get("solutions") or {}
+    features = (solutions.get("product_solution") or {}).get("features") or []
+    target = next((f for f in features if f.get("id") == feature_id), None)
+    if target is None:
+        raise HTTPException(status_code=404, detail=f"功能项不存在: {feature_id}")
+
+    updates = {k: v for k, v in req.model_dump().items() if v is not None}
+    if updates.get("priority") and updates["priority"] not in ("P0", "P1", "P2"):
+        raise HTTPException(status_code=400, detail="priority 仅支持 P0/P1/P2")
+    target.update(updates)
+
+    storage.update_project(project_id, {"solutions": solutions})
+    return {"success": True, "feature": target}
 
 
 @app.get("/api/v1/projects/{project_id}/badcases")
