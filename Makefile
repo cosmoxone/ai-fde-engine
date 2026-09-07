@@ -2,7 +2,7 @@
 # AI-FDE Engine Makefile
 # ============================================
 
-.PHONY: help install dev test test-cov lint format docker-build docker-up docker-down docker-logs docker-restart backup clean
+.PHONY: help install install-full dev test test-cov lint format type-check docker-single docker-build docker-up docker-down docker-logs docker-restart backup clean
 
 # 默认目标
 help: ## 显示帮助信息
@@ -43,17 +43,24 @@ type-check: ## 类型检查
 	mypy src/
 
 # ===== Docker部署 =====
-docker-build: ## 构建Docker镜像
-	cd deploy && docker compose build
+docker-single: ## 单容器模式（拉取GHCR镜像并运行，SQLite持久化，开箱即用）
+	docker pull ghcr.io/cosmoxone/ai-fde-engine:latest || \
+	  docker build -f deploy/Dockerfile --build-arg REQUIREMENTS=requirements-core.txt -t ghcr.io/cosmoxone/ai-fde-engine:latest .
+	docker rm -f aifde-single 2>/dev/null || true
+	docker run -d --name aifde-single -p 8000:8000 -v aifde-data:/app/data ghcr.io/cosmoxone/ai-fde-engine:latest
+	@echo "控制台: http://localhost:8000/dashboard"
 
-docker-up: ## 启动所有服务
-	cd deploy && docker compose up -d
+docker-build: ## 构建全量镜像（六服务编排用）
+	cd deploy && docker compose -f docker-compose.full.yml build
+
+docker-up: ## 启动所有服务（全量编排）
+	cd deploy && docker compose -f docker-compose.full.yml up -d
 
 docker-down: ## 停止所有服务
-	cd deploy && docker compose down
+	cd deploy && docker compose -f docker-compose.full.yml down
 
 docker-restart: ## 重启应用服务
-	cd deploy && docker compose restart ai-fde-app
+	cd deploy && docker compose -f docker-compose.full.yml restart ai-fde-app
 
 docker-logs: ## 查看应用日志
 	cd deploy && docker compose logs -f ai-fde-app

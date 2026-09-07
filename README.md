@@ -55,14 +55,16 @@ AI-FDE Engine 是一套面向FDE团队的AI化交付生产系统，把FDE从「�
 ### 方式一：单容器模式（推荐，开箱即用）
 
 ```bash
-# 核心镜像（Mock 模式 + SQLite 持久化），数据存于 docker 卷，重启/升级不丢
-docker build -f deploy/Dockerfile \
-  --build-arg REQUIREMENTS=requirements-core.txt \
-  -t aifde-engine .
-docker run -d --name aifde -p 8000:8000 -v aifde-data:/app/data aifde-engine
+# 拉取官方镜像（Mock 模式 + SQLite 持久化，约200MB），数据存于 docker 卷，重启/升级不丢
+docker run -d --name aifde -p 8000:8000 \
+  -v aifde-data:/app/data \
+  ghcr.io/cosmoxone/ai-fde-engine:latest
 
 # 浏览器打开 http://localhost:8000/dashboard
 # 在 Dashboard 设置页填入 LLM API Key 即切换真实模式（无需重启）
+#
+# 本地构建备选：
+# docker build -f deploy/Dockerfile --build-arg REQUIREMENTS=requirements-core.txt -t aifde-engine .
 ```
 
 ### 方式二：全量编排（可选，六服务：PG/Qdrant/MinIO/Redis/nginx）
