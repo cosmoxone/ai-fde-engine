@@ -40,6 +40,9 @@ dependencies = [
     "jinja2>=3.1.0",
 ]
 
+[project.scripts]
+aifde = "src.cli:main"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
@@ -56,6 +59,9 @@ all = ["docling>=2.0.0", "marker-pdf>=1.0.0", "deepeval>=0.24.0"]
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
+
+[tool.setuptools.package-data]
+src = ["templates/packs/*.json"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
