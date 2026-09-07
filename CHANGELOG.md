@@ -3,6 +3,18 @@
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.1.3] - 2026-09-07
+
+### Added
+
+- **可编辑确认流（B4）**：`PATCH /projects/{id}/requirements/{rid}` 与 `PATCH /projects/{id}/solutions/features/{fid}`——AI 产出为初稿，FDE 修改后直接进入基线（记录修改轨迹），导出交付物包含最新内容；Dashboard 项目详情新增「需求基线✏️」标签页支持行内编辑
+- **FDE 用户手册（B6）**：`docs/11-用户手册.md`——30 分钟跑通首个项目全流程（安装/配 Key/八步操作/日常工作流/FAQ/命令速查）
+
+### Changed
+
+- 测试 438 → **444**（可编辑确认流 6 条）
+- 路线图版本调整：分发生态顺延为 v0.1.4
+
 ## [0.1.2] - 2026-09-07
 
 ### Added

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-fde-engine"
-version = "0.1.2"
+version = "0.1.3"
 description = "AI驱动的FDE交付引擎 - 调研、设计、开发、迭代全流程AI化"
 readme = "README.md"
 requires-python = ">=3.11"
