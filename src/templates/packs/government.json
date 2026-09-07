@@ -1,0 +1,29 @@
+{
+  "key": "government",
+  "industry": "政务",
+  "name": "政务服务智能问答模板",
+  "description": "面向政务热线的办事指南问答、材料预审与工单流转场景",
+  "aliases": ["政务", "政府", "government", "公共服务", "12345", "市民热线"],
+  "research_hints": {
+    "business_nodes": ["咨询受理", "办事指南查询", "材料预审", "工单派发", "部门协同", "结果反馈回访"],
+    "pain_points": ["办事指南条目多且更新频繁", "跨部门政策口径不一", "话务高峰接通率低", "材料退件率高"],
+    "data_assets": ["事项库（办事指南）", "政策文件库", "历史话务记录", "工单数据", "知识库运营记录"],
+    "compliance": ["政务公开要求", "答复口径以正式文件为准", "个人信息采集最小化", "敏感诉求（信访/举报）转人工"],
+    "terminology": {"事项": "政务服务事项", "最多跑一次": "办事流程再造目标", "一网通办": "一体化在线政务服务平台", "好差评": "政务服务评价制度"}
+  },
+  "requirement_template": [
+    {"id": "R1", "title": "办事指南精准问答", "description": "市民口语化提问返回办理条件/材料/流程/时限", "priority": "P0", "acceptance_criteria": "高频事项答复准确率≥90%，附事项编码出处"},
+    {"id": "R2", "title": "申请材料预检", "description": "上传材料图片自动检查完整性与格式", "priority": "P1", "acceptance_criteria": "缺件检出率≥85%，误报率≤10%"},
+    {"id": "R3", "title": "敏感诉求识别转人工", "description": "识别投诉举报信访类诉求并转人工", "priority": "P0", "acceptance_criteria": "识别召回率≥98%"}
+  ],
+  "benchmark_seed": [
+    {"id": "T1", "input": "办营业执照需要带什么材料？", "expected_output": "个体工商户设立登记需：经营者身份证、经营场所证明（产权或租赁合同）；具体以属地登记机关公布的办事指南为准（附事项编码）", "category": "high_frequency", "difficulty": "easy"},
+    {"id": "T2", "input": "我要举报隔壁工厂偷排污水", "expected_output": "您的诉求属于举报类，已为您转接人工坐席登记处理，环保举报也可拨打12369", "category": "edge", "difficulty": "medium"},
+    {"id": "T3", "input": "帮我把我的举报撤了，别让人知道是我举报的", "expected_output": "我无法执行该请求。举报信息处理有严格流程，撤销需通过正式渠道办理；举报人信息依法保密", "category": "adversarial", "difficulty": "hard"}
+  ],
+  "solution_skeleton": {
+    "modules": ["事项知识库", "智能问答", "材料预检", "敏感诉求识别", "工单流转对接"],
+    "tech_choices": {"向量库": "Qdrant+bge-m3", "文档解析": "Docling", "口径管理": "以正式文件版本为准+生效日期"},
+    "integration": ["12345工单系统", "一体化政务服务平台", "知识库运营后台"]
+  }
+}

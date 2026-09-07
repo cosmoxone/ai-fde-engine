@@ -26,10 +26,12 @@ class BenchmarkTool:
         self,
         documents: list[dict],
         config: Optional[dict] = None,
+        seed_cases: Optional[list[dict]] = None,
     ) -> dict:
         """
         基于业务文档自动生成Benchmark测试集
         三类测试用例：高频场景(60%) / 边界场景(30%) / 对抗场景(10%)
+        seed_cases: v0.1.2 B2 行业模板种子用例（真实行业样例，优先纳入）
         """
         config = config or {}
         case_count = config.get("case_count", self.settings.benchmark_default_case_count)
@@ -47,6 +49,13 @@ class BenchmarkTool:
         adv_count = case_count - high_count - edge_count
 
         test_cases = []
+        # 行业种子用例优先纳入（真实样例，保障 Benchmark 行业贴合度）
+        existing_ids: set[str] = set()
+        if seed_cases:
+            for sc in seed_cases:
+                if sc.get("id") not in existing_ids:
+                    test_cases.append(sc)
+                    existing_ids.add(sc.get("id"))
         test_cases.extend(self._generate_high_frequency_cases(high_count, documents))
         test_cases.extend(self._generate_edge_cases(edge_count, documents))
         if self.settings.benchmark_adversarial_enabled:

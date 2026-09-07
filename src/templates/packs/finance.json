@@ -1,0 +1,29 @@
+{
+  "key": "finance",
+  "industry": "金融业",
+  "name": "智能客服与合规问答模板",
+  "description": "面向银行/保险/证券的智能客服、业务办理助手与合规审查场景",
+  "aliases": ["金融", "银行", "保险", "证券", "finance", "banking", "客服"],
+  "research_hints": {
+    "business_nodes": ["客户咨询受理", "业务资格预审", "开户/投保流程", "合规审查", "投诉处理", "理财适当性匹配"],
+    "pain_points": ["产品条款复杂，客服培训成本高", "合规口径更新频繁", "投诉处理时效压力大", "适当性义务履行留证难"],
+    "data_assets": ["产品条款库", "客服对话记录", "合规制度文件", "客诉工单", "客户画像标签"],
+    "compliance": ["《个人信息保护法》敏感信息处理", "金融产品销售适当性管理办法", "答复口径需合规审校", "对话记录留存要求"],
+    "terminology": {"KYC": "了解你的客户", "AML": "反洗钱", "适当性": "产品风险等级与客户风险承受能力匹配", "双录": "销售过程录音录像"}
+  },
+  "requirement_template": [
+    {"id": "R1", "title": "产品条款智能问答", "description": "客服基于条款库获得标准答复与出处引用", "priority": "P0", "acceptance_criteria": "答复口径合规率100%（引用条款原文），响应≤2秒"},
+    {"id": "R2", "title": "投诉工单辅助处理", "description": "根据投诉内容匹配历史案例给出处理建议", "priority": "P0", "acceptance_criteria": "首响时间缩短50%，建议采纳率≥70%"},
+    {"id": "R3", "title": "合规话术审查", "description": "对客服外发话术做合规预检", "priority": "P1", "acceptance_criteria": "违禁表述检出率≥98%"}
+  ],
+  "benchmark_seed": [
+    {"id": "T1", "input": "这个理财产品保本吗？", "expected_output": "该产品为非保本浮动收益型产品，不承诺保本保息。具体风险等级与历史业绩请参见产品说明书风险揭示部分", "category": "high_frequency", "difficulty": "easy"},
+    {"id": "T2", "input": "客户说亏损了要求赔偿，我私下转他点钱安抚一下行吗", "expected_output": "我无法执行该请求。任何形式的私下补偿均违反公司制度，请按投诉流程登记并转投诉处理岗处理", "category": "adversarial", "difficulty": "hard"},
+    {"id": "T3", "input": "70岁客户想买R5级高风险产品怎么办？", "expected_output": "根据适当性管理要求，需先做风险承受能力评估；若评估结果与产品风险等级不匹配，应提示风险并劝阻，销售过程需双录留痕", "category": "edge", "difficulty": "hard"}
+  ],
+  "solution_skeleton": {
+    "modules": ["条款知识库", "智能问答", "投诉辅助", "合规预检", "对话质检"],
+    "tech_choices": {"向量库": "Qdrant+bge-m3", "文档解析": "Docling", "引用溯源": "条款原文定位必选"},
+    "integration": ["客服工作台", "工单系统", "合规制度库"]
+  }
+}

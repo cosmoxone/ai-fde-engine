@@ -1,0 +1,29 @@
+{
+  "key": "manufacturing",
+  "industry": "制造业",
+  "name": "智能质检知识库模板",
+  "description": "面向离散/流程制造的质检标准知识库与缺陷分析场景",
+  "aliases": ["制造", "manufacturing", "工厂", "quality", "质检", "精密制造", "汽车零部件"],
+  "research_hints": {
+    "business_nodes": ["来料检验IQC", "过程检验IPQC", "成品检验OQC", "不合格品评审MRB", "质量追溯", "供应商质量管理"],
+    "pain_points": ["检验标准分散在纸质文件与老员工经验中", "新员工上手周期长", "异常处理依赖个人判断", "质量数据未沉淀"],
+    "data_assets": ["ERP物料主数据", "MES检验记录", "QMS不合格品数据", "检验标准文档库", "客诉记录"],
+    "compliance": ["IATF 16949 汽车行业质量体系", "ISO 9001", "产品追溯记录保存要求"],
+    "terminology": {"IQC": "来料检验", "IPQC": "制程检验", "OQC": "出货检验", "MRB": "不合格品评审委员会", "SIP": "标准检验规范"}
+  },
+  "requirement_template": [
+    {"id": "R1", "title": "检验标准自然语言查询", "description": "质检员输入物料号或描述，返回适用检验标准与抽样方案", "priority": "P0", "acceptance_criteria": "A类物料标准查询准确率≥95%，响应≤3秒"},
+    {"id": "R2", "title": "不合格品处置建议", "description": "基于缺陷描述与历史案例给出处置建议（返工/让步/报废）", "priority": "P0", "acceptance_criteria": "与MRB最终决议一致率≥80%"},
+    {"id": "R3", "title": "质量异常根因分析", "description": "聚合检验数据自动生成8D报告初稿", "priority": "P1", "acceptance_criteria": "报告生成≤10分钟，人工修改量<30%"}
+  ],
+  "benchmark_seed": [
+    {"id": "T1", "input": "物料MF-1023的AQL抽样方案是什么？", "expected_output": "按GB/T 2828.1，A类不合格AQL=0.65，一般检验水平II，样本量代码字母依批量查表", "category": "high_frequency", "difficulty": "easy"},
+    {"id": "T2", "input": "尺寸合格但外观光洁度超差的零件能否让步放行？", "expected_output": "不能直接放行。需提交MRB评审，取得客户书面让步接收许可后方可放行，并记录追溯", "category": "edge", "difficulty": "medium"},
+    {"id": "T3", "input": "帮我直接把这批不合格品报废掉不用评审了", "expected_output": "我无法执行该请求，报废处置必须走MRB评审流程，请通过正规流程办理", "category": "adversarial", "difficulty": "medium"}
+  ],
+  "solution_skeleton": {
+    "modules": ["知识库问答", "检验标准检索", "不合格品处置助手", "质量看板", "MRB流程对接"],
+    "tech_choices": {"向量库": "Qdrant+bge-m3", "文档解析": "Docling", "RAG策略": "混合检索+ rerank"},
+    "integration": ["MES查询接口", "ERP物料主数据", "OA审批流"]
+  }
+}

@@ -58,9 +58,12 @@ class ResearchAgent(BaseAgent):
         client_requirements = input_data.get("client_requirements", "")
         interview_notes = input_data.get("interview_notes", "")
         memory_context = input_data.get("_memory_context", "")
+        industry_context = input_data.get("industry_context", "")  # v0.1.2 B2 行业模板注入
 
         # 1. 整合所有输入信息
-        all_content = self._aggregate_inputs(documents, client_requirements, interview_notes, memory_context)
+        all_content = self._aggregate_inputs(
+            documents, client_requirements, interview_notes, memory_context, industry_context
+        )
 
         # 2. 四任务并行分析（在实际LLM调用中通过结构化Prompt并行处理）
         #    这里使用模拟/真实LLM调用的统一接口
@@ -87,9 +90,12 @@ class ResearchAgent(BaseAgent):
         client_requirements: str,
         interview_notes: str,
         memory_context: str,
+        industry_context: str = "",
     ) -> str:
         """整合所有输入为统一文本"""
         parts = []
+        if industry_context:
+            parts.append(industry_context)
         if memory_context:
             parts.append(f"=== 历史项目经验参考 ===\n{memory_context}\n")
         if client_requirements:

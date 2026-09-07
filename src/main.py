@@ -27,6 +27,7 @@ from .exporter import build_deliverables, export_zip
 from .memory import get_memory_manager
 from .pipeline.iteration import NightlyIterationPipeline
 from .storage import get_storage
+from .templates import build_research_context, list_templates, match_template
 from .tools.benchmark import BenchmarkTool
 from .tools.doc_parser import DocParserTool
 
@@ -196,6 +197,15 @@ class ReviewActionRequest(BaseModel):
 
 
 # ===== 健康检查 =====
+# ===== 行业模板库（v0.1.2 B2）=====
+
+
+@app.get("/api/v1/templates")
+async def get_templates():
+    """行业模板清单（内置：制造业质检/金融客服/政务问答）"""
+    return {"success": True, "templates": list_templates()}
+
+
 # ===== 运行时设置（v0.1.1 A3：Web配置引导）=====
 
 
@@ -420,11 +430,15 @@ async def run_research(project_id: str, req: ResearchRun, background_tasks: Back
         try:
             agent = ResearchAgent(project_id)
             docs = get_storage().list_documents(project_id)
+            # v0.1.2 B2: 行业模板上下文注入（提升真实LLM输出贴合度）
+            pack = match_template(get_storage().get_project(project_id).get("industry", ""))
+            industry_ctx = build_research_context(pack) if pack else ""
             result = await agent.execute(
                 {
                     "documents": docs,
                     "client_requirements": req.client_requirements,
                     "interview_notes": req.interview_notes,
+                    "industry_context": industry_ctx,
                 }
             )
             get_storage().update_task(task_id, {"status": "completed", "result": result.to_dict()})
@@ -552,7 +566,10 @@ async def generate_benchmark(project_id: str, background_tasks: BackgroundTasks)
             tool = BenchmarkTool(project_id)
             docs = get_storage().list_documents(project_id)
             doc_contents = [{"content": d.get("content", ""), "filename": d.get("filename", "")} for d in docs]
-            benchmark = await tool.generate(doc_contents)
+            # v0.1.2 B2: 无业务文档时用行业模板种子用例打底（行业贴合度）
+            pack = match_template(get_storage().get_project(project_id).get("industry", ""))
+            seed = pack.benchmark_seed if pack and not doc_contents else None
+            benchmark = await tool.generate(doc_contents, seed_cases=seed)
             get_storage().save_benchmark(benchmark)
             get_storage().update_task(
                 task_id,
