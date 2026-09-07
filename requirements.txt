@@ -86,3 +86,6 @@ pytest-cov>=4.1.0
 # ===== 可观测性增强（可选，需要Docker服务）=====
 # LangFuse: LLM可观测性，追踪、评估、提示词管理
 # langfuse>=3.0.0
+
+# MCP Server（Claude Desktop/Cursor 接入 mcp_server.py 时需要）
+mcp>=1.2.0,<2.0.0
