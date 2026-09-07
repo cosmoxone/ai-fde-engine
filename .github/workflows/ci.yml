@@ -67,10 +67,25 @@ jobs:
           "
 
   docker:
-    name: Docker build
+    name: Docker build & smoke
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build image
-        run: docker build -f deploy/Dockerfile -t aifde-engine-ci .
+      # 核心依赖构建：验证镜像可构建且服务可启动（全量镜像构建耗时较长，留给发布流程）
+      - name: Build image (core)
+        run: docker build -f deploy/Dockerfile --build-arg REQUIREMENTS=requirements-core.txt -t aifde-engine-ci .
+
+      - name: Smoke test (container boot + health)
+        run: |
+          docker run -d --name aifde-smoke -p 8000:8000 aifde-engine-ci
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:8000/api/v1/health > /dev/null 2>&1; then
+              echo "container health check passed"; docker rm -f aifde-smoke; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::container health check failed"
+          docker logs aifde-smoke | tail -50
+          docker rm -f aifde-smoke
+          exit 1

@@ -6,6 +6,9 @@
 # ===== 构建阶段 =====
 FROM python:3.11-slim AS builder
 
+# REQUIREMENTS: requirements-core.txt（轻量，Mock模式）/ requirements.txt（全量，真实组件）
+ARG REQUIREMENTS=requirements.txt
+
 WORKDIR /build
 
 # 安装系统依赖（编译需要）
@@ -16,10 +19,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件
-COPY requirements.txt .
+COPY requirements-core.txt requirements.txt ./
 
 # 安装依赖到临时目录
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+RUN pip install --no-cache-dir --prefix=/install -r ${REQUIREMENTS}
 
 # ===== 运行阶段 =====
 FROM python:3.11-slim AS runtime
