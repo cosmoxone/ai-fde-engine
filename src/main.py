@@ -2,6 +2,7 @@
 AI-FDE Engine 主应用入口 - FastAPI
 提供REST API + WebSocket，统一调度四大Agent
 """
+
 from __future__ import annotations
 
 import os
@@ -9,25 +10,23 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .config import get_settings
-from .agents.research import ResearchAgent
-from .agents.design import DesignAgent
 from .agents.delivery import DeliveryAgent
-from .agents.project import ProjectAgent
+from .agents.design import DesignAgent
+from .agents.research import ResearchAgent
 from .agents.self_service import SelfServiceAgent
 from .agents.training import TrainingAgent
-from .memory import get_memory_manager
-from .tools.doc_parser import DocParserTool
-from .tools.knowledge_base import KnowledgeBaseTool
-from .tools.benchmark import BenchmarkTool
+from .config import get_settings
 from .evaluation.evaluator import Evaluator
+from .memory import get_memory_manager
 from .pipeline.iteration import NightlyIterationPipeline
+from .tools.benchmark import BenchmarkTool
+from .tools.doc_parser import DocParserTool
 
 settings = get_settings()
 
@@ -47,13 +46,14 @@ def _add_to_review_queue(project_id: str, review_type: str, result: Any = None, 
     实现"后台默默干活，完成后通知人工审核"的闭环
     """
     import time as _time
+
     review_item = {
         "review_id": f"rev-{uuid.uuid4().hex[:8]}",
         "project_id": project_id,
         "type": review_type,
         "status": "pending" if requires_approval else "auto_approved",
         "created_at": _time.time(),
-        "result": result.to_dict() if hasattr(result, 'to_dict') else result,
+        "result": result.to_dict() if hasattr(result, "to_dict") else result,
         "requires_approval": requires_approval,
     }
     _review_queue.append(review_item)
@@ -86,15 +86,16 @@ app.add_middleware(
 )
 
 # ===== 静态文件与Dashboard =====
-import os
 _static_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static")
 if os.path.exists(_static_dir):
     app.mount("/static", StaticFiles(directory=_static_dir), name="static")
+
 
 @app.get("/")
 async def root():
     """根路径重定向到Dashboard"""
     return RedirectResponse(url="/dashboard")
+
 
 @app.get("/dashboard")
 async def dashboard():
@@ -332,11 +333,13 @@ async def run_research(project_id: str, req: ResearchRun, background_tasks: Back
         try:
             agent = ResearchAgent(project_id)
             docs = _documents.get(project_id, [])
-            result = await agent.execute({
-                "documents": docs,
-                "client_requirements": req.client_requirements,
-                "interview_notes": req.interview_notes,
-            })
+            result = await agent.execute(
+                {
+                    "documents": docs,
+                    "client_requirements": req.client_requirements,
+                    "interview_notes": req.interview_notes,
+                }
+            )
             _tasks[task_id]["status"] = "completed"
             _tasks[task_id]["result"] = result.to_dict()
             _projects[project_id]["requirements_baseline"] = result.structured_output
@@ -359,18 +362,26 @@ async def run_design(project_id: str, req: DesignRun, background_tasks: Backgrou
         raise HTTPException(status_code=404, detail="项目不存在")
 
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {"id": task_id, "project_id": project_id, "type": "design", "status": "running", "created_at": __import__("time").time()}
+    _tasks[task_id] = {
+        "id": task_id,
+        "project_id": project_id,
+        "type": "design",
+        "status": "running",
+        "created_at": __import__("time").time(),
+    }
 
     async def do_design():
         try:
             agent = DesignAgent(project_id)
             baseline = req.requirements_baseline or _projects[project_id].get("requirements_baseline", {})
-            result = await agent.execute({
-                "requirements_baseline": baseline,
-                "business_process": baseline.get("business_process", {}),
-                "data_assets": baseline.get("data_assets", {}),
-                "benchmark": baseline.get("benchmark", {}),
-            })
+            result = await agent.execute(
+                {
+                    "requirements_baseline": baseline,
+                    "business_process": baseline.get("business_process", {}),
+                    "data_assets": baseline.get("data_assets", {}),
+                    "benchmark": baseline.get("benchmark", {}),
+                }
+            )
             _tasks[task_id]["status"] = "completed"
             _tasks[task_id]["result"] = result.to_dict()
             _projects[project_id]["solutions"] = result.structured_output
@@ -393,18 +404,31 @@ async def run_delivery(project_id: str, req: DeliveryRun, background_tasks: Back
         raise HTTPException(status_code=404, detail="项目不存在")
 
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {"id": task_id, "project_id": project_id, "type": f"delivery_{req.task_type}", "status": "running", "created_at": __import__("time").time()}
+    _tasks[task_id] = {
+        "id": task_id,
+        "project_id": project_id,
+        "type": f"delivery_{req.task_type}",
+        "status": "running",
+        "created_at": __import__("time").time(),
+    }
 
     async def do_delivery():
         try:
             agent = DeliveryAgent(project_id)
-            result = await agent.execute({
-                "task_type": req.task_type,
-                "tech_solution": req.tech_solution or _projects[project_id].get("solutions", {}).get("tech_solution", {}),
-                "requirements": req.requirements or _projects[project_id].get("requirements_baseline", {}).get("requirements", {}).get("functional", []),
-                "badcases": req.badcases or [],
-                "project_name": _projects[project_id]["name"],
-            })
+            result = await agent.execute(
+                {
+                    "task_type": req.task_type,
+                    "tech_solution": req.tech_solution
+                    or _projects[project_id].get("solutions", {}).get("tech_solution", {}),
+                    "requirements": req.requirements
+                    or _projects[project_id]
+                    .get("requirements_baseline", {})
+                    .get("requirements", {})
+                    .get("functional", []),
+                    "badcases": req.badcases or [],
+                    "project_name": _projects[project_id]["name"],
+                }
+            )
             _tasks[task_id]["status"] = "completed"
             _tasks[task_id]["result"] = result.to_dict()
             # 代码生成类任务完成后自动入审核队列（代码需要人工Review）
@@ -426,7 +450,13 @@ async def generate_benchmark(project_id: str, background_tasks: BackgroundTasks)
         raise HTTPException(status_code=404, detail="项目不存在")
 
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {"id": task_id, "project_id": project_id, "type": "benchmark_generate", "status": "running", "created_at": __import__("time").time()}
+    _tasks[task_id] = {
+        "id": task_id,
+        "project_id": project_id,
+        "type": "benchmark_generate",
+        "status": "running",
+        "created_at": __import__("time").time(),
+    }
 
     async def do_generate():
         try:
@@ -436,7 +466,10 @@ async def generate_benchmark(project_id: str, background_tasks: BackgroundTasks)
             benchmark = await tool.generate(doc_contents)
             _benchmarks[benchmark["benchmark_id"]] = benchmark
             _tasks[task_id]["status"] = "completed"
-            _tasks[task_id]["result"] = {"benchmark_id": benchmark["benchmark_id"], "case_count": benchmark["case_count"]}
+            _tasks[task_id]["result"] = {
+                "benchmark_id": benchmark["benchmark_id"],
+                "case_count": benchmark["case_count"],
+            }
         except Exception as e:
             _tasks[task_id]["status"] = "failed"
             _tasks[task_id]["error"] = str(e)
@@ -459,7 +492,13 @@ async def run_benchmark_eval(project_id: str, benchmark_id: str, background_task
         raise HTTPException(status_code=404, detail="Benchmark不存在")
 
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {"id": task_id, "project_id": project_id, "type": "benchmark_eval", "status": "running", "created_at": __import__("time").time()}
+    _tasks[task_id] = {
+        "id": task_id,
+        "project_id": project_id,
+        "type": "benchmark_eval",
+        "status": "running",
+        "created_at": __import__("time").time(),
+    }
 
     async def do_eval():
         try:
@@ -489,7 +528,13 @@ async def run_iteration(project_id: str, req: IterationRun, background_tasks: Ba
         raise HTTPException(status_code=404, detail="项目不存在")
 
     task_id = str(uuid.uuid4())
-    _tasks[task_id] = {"id": task_id, "project_id": project_id, "type": "nightly_iteration", "status": "running", "created_at": __import__("time").time()}
+    _tasks[task_id] = {
+        "id": task_id,
+        "project_id": project_id,
+        "type": "nightly_iteration",
+        "status": "running",
+        "created_at": __import__("time").time(),
+    }
 
     async def do_iteration():
         try:
@@ -574,6 +619,7 @@ async def consolidate_memory(project_id: str):
 
 # ===== 自助交付（F7）=====
 
+
 def _get_self_service_agent(project_id: str) -> SelfServiceAgent:
     """获取或创建自助服务Agent"""
     if project_id not in _self_service_agents:
@@ -600,25 +646,31 @@ async def identify_opportunities(project_id: str, req: OpportunityIdentifyReques
     _tasks[task_id] = {"task_id": task_id, "status": "running", "type": "identify_opportunities"}
 
     async def _run():
-        result = await agent.run({
-            "task_type": "identify_opportunities",
-            "business_description": req.business_description,
-            "industry": req.industry,
-            "pain_points": req.pain_points,
-        })
+        result = await agent.run(
+            {
+                "task_type": "identify_opportunities",
+                "business_description": req.business_description,
+                "industry": req.industry,
+                "pain_points": req.pain_points,
+            }
+        )
         _tasks[task_id] = {
-            "task_id": task_id, "status": "completed", "type": "identify_opportunities",
+            "task_id": task_id,
+            "status": "completed",
+            "type": "identify_opportunities",
             "result": result.to_dict(),
         }
         # 如果需要FDE审核，加入审核队列
         if result.metadata.get("needs_fde_review"):
-            _review_queue.append({
-                "review_id": f"rev-{uuid.uuid4().hex[:8]}",
-                "project_id": project_id,
-                "type": "opportunity_identification",
-                "status": "pending",
-                "created_at": __import__("time").time(),
-            })
+            _review_queue.append(
+                {
+                    "review_id": f"rev-{uuid.uuid4().hex[:8]}",
+                    "project_id": project_id,
+                    "type": "opportunity_identification",
+                    "status": "pending",
+                    "created_at": __import__("time").time(),
+                }
+            )
 
     background_tasks.add_task(_run)
     return {"success": True, "task_id": task_id, "message": "AI落地机会识别已启动"}
@@ -630,14 +682,16 @@ async def guide_requirements(project_id: str, req: RequirementGuideRequest):
     if project_id not in _projects:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
-    result = await agent.run({
-        "task_type": "guide_requirement",
-        "action": req.action,
-        "requirement_draft": req.requirement_draft,
-        "user_feedback": req.user_feedback,
-        "modified_requirements": req.modified_requirements,
-        "new_requirements": req.new_requirements,
-    })
+    result = await agent.run(
+        {
+            "task_type": "guide_requirement",
+            "action": req.action,
+            "requirement_draft": req.requirement_draft,
+            "user_feedback": req.user_feedback,
+            "modified_requirements": req.modified_requirements,
+            "new_requirements": req.new_requirements,
+        }
+    )
     if not result.success:
         raise HTTPException(status_code=400, detail=result.error)
     return {"success": True, "result": result.structured_output}
@@ -649,18 +703,22 @@ async def configure_solution(project_id: str, req: SolutionConfigRequest):
     if project_id not in _projects:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
-    result = await agent.run({
-        "task_type": "configure_solution",
-        "selected_modules": req.selected_modules,
-        "deployment_mode": req.deployment_mode,
-        "integration_level": req.integration_level,
-        "budget": req.budget,
-    })
+    result = await agent.run(
+        {
+            "task_type": "configure_solution",
+            "selected_modules": req.selected_modules,
+            "deployment_mode": req.deployment_mode,
+            "integration_level": req.integration_level,
+            "budget": req.budget,
+        }
+    )
     # 检测预算和功能模块偏离
-    deviations = agent._detect_deviations({
-        "selected_modules": req.selected_modules,
-        "budget": req.budget or 0,
-    })
+    deviations = agent._detect_deviations(
+        {
+            "selected_modules": req.selected_modules,
+            "budget": req.budget or 0,
+        }
+    )
     return {
         "success": True,
         "result": result.structured_output,
@@ -674,11 +732,13 @@ async def generate_prototype(project_id: str, req: PrototypeGenerateRequest):
     if project_id not in _projects:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
-    result = await agent.run({
-        "task_type": "generate_prototype",
-        "prototype_type": req.prototype_type,
-        "config": req.config,
-    })
+    result = await agent.run(
+        {
+            "task_type": "generate_prototype",
+            "prototype_type": req.prototype_type,
+            "config": req.config,
+        }
+    )
     return {"success": True, "result": result.structured_output}
 
 
@@ -697,7 +757,10 @@ async def get_value_dashboard(project_id: str):
         "value": {
             "metrics": [agent._metric_to_dict(m) for m in agent.value_metrics],
             "summary": {
-                "average_improvement": sum(m.improvement_percentage for m in agent.value_metrics) / len(agent.value_metrics) if agent.value_metrics else 0,
+                "average_improvement": sum(m.improvement_percentage for m in agent.value_metrics)
+                / len(agent.value_metrics)
+                if agent.value_metrics
+                else 0,
             },
         },
     }
@@ -709,12 +772,14 @@ async def calculate_value(project_id: str, req: ValueCalculateRequest):
     if project_id not in _projects:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
-    result = await agent.run({
-        "task_type": "calculate_value",
-        "baseline": req.baseline,
-        "current": req.current,
-        "investment": req.investment,
-    })
+    result = await agent.run(
+        {
+            "task_type": "calculate_value",
+            "baseline": req.baseline,
+            "current": req.current,
+            "investment": req.investment,
+        }
+    )
     return {"success": True, "result": result.structured_output}
 
 
@@ -724,13 +789,15 @@ async def submit_self_service_feedback(project_id: str, req: SelfServiceFeedback
     if project_id not in _projects:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
-    result = await agent.run({
-        "task_type": "submit_feedback",
-        "feedback_type": req.feedback_type,
-        "content": req.content,
-        "rating": req.rating,
-        "prototype_id": req.prototype_id,
-    })
+    result = await agent.run(
+        {
+            "task_type": "submit_feedback",
+            "feedback_type": req.feedback_type,
+            "content": req.content,
+            "rating": req.rating,
+            "prototype_id": req.prototype_id,
+        }
+    )
     # 存储反馈
     if project_id not in _feedback_store:
         _feedback_store[project_id] = []
@@ -752,12 +819,14 @@ async def complete_guidance_step(project_id: str, req: CompleteStepRequest):
     if project_id not in _projects:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
-    result = await agent.run({
-        "task_type": "complete_step",
-        "step_id": req.step_id,
-        "confirmation": req.confirmation,
-        "user_input": req.user_input,
-    })
+    result = await agent.run(
+        {
+            "task_type": "complete_step",
+            "step_id": req.step_id,
+            "confirmation": req.confirmation,
+            "user_input": req.user_input,
+        }
+    )
     if not result.success:
         raise HTTPException(status_code=400, detail=result.error)
     return {"success": True, "result": result.structured_output}
@@ -777,6 +846,7 @@ async def get_deviation_alerts(project_id: str):
 
 
 # ===== F7 P1 增强功能 =====
+
 
 @app.post("/api/v1/projects/{project_id}/self-service/training/push")
 async def push_training_content(project_id: str):
@@ -824,16 +894,19 @@ async def log_communication(project_id: str, req: dict):
     if project_id not in _projects:
         raise HTTPException(status_code=404, detail="项目不存在")
     agent = _get_self_service_agent(project_id)
-    result = await agent.run({
-        "task_type": "log_communication",
-        "type": req.get("type", "meeting"),
-        "content": req.get("content", ""),
-        "participants": req.get("participants", []),
-    })
+    result = await agent.run(
+        {
+            "task_type": "log_communication",
+            "type": req.get("type", "meeting"),
+            "content": req.get("content", ""),
+            "participants": req.get("participants", []),
+        }
+    )
     return {"success": True, "result": result.structured_output}
 
 
 # ===== 后台Review工作台（FDE视角）=====
+
 
 @app.get("/api/v1/self-service/review/pending")
 async def list_pending_reviews():
@@ -885,11 +958,13 @@ async def assess_competency(req: dict):
     """F8.1+F8.7 能力评估：基于背景和表现评估FDE能力等级"""
     learner_id = req.get("learner_id", f"learner-{uuid.uuid4().hex[:8]}")
     agent = _get_training_agent(learner_id)
-    result = await agent.run({
-        "task_type": "assess_competency",
-        "background": req.get("background", {}),
-        "assessment": req.get("assessment", {}),
-    })
+    result = await agent.run(
+        {
+            "task_type": "assess_competency",
+            "background": req.get("background", {}),
+            "assessment": req.get("assessment", {}),
+        }
+    )
     return {"success": True, "learner_id": learner_id, "assessment": result.structured_output}
 
 
@@ -898,12 +973,14 @@ async def generate_learning_path(req: dict):
     """F8.2 生成个性化学习路径（6周成长计划）"""
     learner_id = req.get("learner_id", f"learner-{uuid.uuid4().hex[:8]}")
     agent = _get_training_agent(learner_id)
-    result = await agent.run({
-        "task_type": "generate_learning_path",
-        "target_level": req.get("target_level", "L3"),
-        "current_level": req.get("current_level", "L1"),
-        "background": req.get("background", {}),
-    })
+    result = await agent.run(
+        {
+            "task_type": "generate_learning_path",
+            "target_level": req.get("target_level", "L3"),
+            "current_level": req.get("current_level", "L1"),
+            "background": req.get("background", {}),
+        }
+    )
     return {"success": True, "learner_id": learner_id, "learning_path": result.structured_output}
 
 
@@ -912,12 +989,14 @@ async def coach_chat(req: dict):
     """F8.3 AI教练对话辅导（7×24小时）"""
     learner_id = req.get("learner_id", "default")
     agent = _get_training_agent(learner_id)
-    result = await agent.run({
-        "task_type": "coach_chat",
-        "message": req.get("message", ""),
-        "context": req.get("context", {}),
-        "conversation_id": req.get("conversation_id"),
-    })
+    result = await agent.run(
+        {
+            "task_type": "coach_chat",
+            "message": req.get("message", ""),
+            "context": req.get("context", {}),
+            "conversation_id": req.get("conversation_id"),
+        }
+    )
     return {"success": True, "reply": result.structured_output}
 
 
@@ -926,11 +1005,13 @@ async def start_sandbox(req: dict):
     """F8.4 启动实战演练沙箱"""
     learner_id = req.get("learner_id", f"learner-{uuid.uuid4().hex[:8]}")
     agent = _get_training_agent(learner_id)
-    result = await agent.run({
-        "task_type": "start_sandbox",
-        "scenario": req.get("scenario", "full_delivery"),
-        "difficulty": req.get("difficulty", "beginner"),
-    })
+    result = await agent.run(
+        {
+            "task_type": "start_sandbox",
+            "scenario": req.get("scenario", "full_delivery"),
+            "difficulty": req.get("difficulty", "beginner"),
+        }
+    )
     return {"success": True, "learner_id": learner_id, "sandbox": result.structured_output}
 
 
@@ -939,12 +1020,14 @@ async def submit_sandbox_work(req: dict):
     """F8.4+F8.5 提交沙箱作业并获取AI即时点评"""
     learner_id = req.get("learner_id", "default")
     agent = _get_training_agent(learner_id)
-    result = await agent.run({
-        "task_type": "submit_sandbox_work",
-        "sandbox_id": req.get("sandbox_id", ""),
-        "task_id": req.get("task_id", ""),
-        "work": req.get("work", ""),
-    })
+    result = await agent.run(
+        {
+            "task_type": "submit_sandbox_work",
+            "sandbox_id": req.get("sandbox_id", ""),
+            "task_id": req.get("task_id", ""),
+            "work": req.get("work", ""),
+        }
+    )
     return {"success": True, "feedback": result.structured_output}
 
 
@@ -953,11 +1036,13 @@ async def get_training_feedback(req: dict):
     """F8.5 获取操作即时反馈"""
     learner_id = req.get("learner_id", "default")
     agent = _get_training_agent(learner_id)
-    result = await agent.run({
-        "task_type": "get_feedback",
-        "action": req.get("action", ""),
-        "context": req.get("context", {}),
-    })
+    result = await agent.run(
+        {
+            "task_type": "get_feedback",
+            "action": req.get("action", ""),
+            "context": req.get("context", {}),
+        }
+    )
     return {"success": True, "feedback": result.structured_output}
 
 
@@ -965,11 +1050,13 @@ async def get_training_feedback(req: dict):
 async def search_training_knowledge(query: str, category: str = "all"):
     """F8.6 搜索FDE知识库与案例库"""
     agent = _get_training_agent("default")
-    result = await agent.run({
-        "task_type": "search_knowledge",
-        "query": query,
-        "category": category,
-    })
+    result = await agent.run(
+        {
+            "task_type": "search_knowledge",
+            "query": query,
+            "category": category,
+        }
+    )
     return {"success": True, "results": result.structured_output}
 
 
@@ -978,11 +1065,13 @@ async def take_training_exam(req: dict):
     """F8.7 参加能力考核（通过后颁发认证）"""
     learner_id = req.get("learner_id", f"learner-{uuid.uuid4().hex[:8]}")
     agent = _get_training_agent(learner_id)
-    result = await agent.run({
-        "task_type": "take_exam",
-        "target_level": req.get("target_level", "L3"),
-        "answers": req.get("answers", {}),
-    })
+    result = await agent.run(
+        {
+            "task_type": "take_exam",
+            "target_level": req.get("target_level", "L3"),
+            "answers": req.get("answers", {}),
+        }
+    )
     return {"success": True, "learner_id": learner_id, "exam_result": result.structured_output}
 
 
@@ -1036,4 +1125,5 @@ async def project_progress(project_id: str):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=settings.app_port)

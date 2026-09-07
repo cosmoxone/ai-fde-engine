@@ -5,6 +5,7 @@
 
 MVP阶段使用内存模拟 + JSON持久化，生产环境切换为Zep/Letta服务
 """
+
 from __future__ import annotations
 
 import json
@@ -21,6 +22,7 @@ from ..config import get_settings
 @dataclass
 class MemoryItem:
     """记忆条目"""
+
     id: str
     content: str
     memory_type: str = "fact"  # fact / event / entity / relation / experience
@@ -84,6 +86,7 @@ class MemoryManager:
         if self._mem0_client is None:
             try:
                 from mem0 import MemoryClient
+
                 # Mem0支持本地模式和云服务模式
                 self._mem0_client = MemoryClient()
                 print(f"[Memory] Mem0客户端初始化成功 (project={self.project_id})")
@@ -253,10 +256,7 @@ class MemoryManager:
                 parts.append(f"- {name}({info.get('type', 'unknown')}): 提及{info.get('mention_count', 0)}次")
 
         # 最近关键事件
-        recent_events = [
-            m for m in self._memories.values()
-            if m.memory_type == "event" and not m.is_obsolete
-        ][-5:]
+        recent_events = [m for m in self._memories.values() if m.memory_type == "event" and not m.is_obsolete][-5:]
         if recent_events:
             parts.append("\n【最近关键事件】")
             for e in recent_events:
@@ -293,12 +293,14 @@ class MemoryManager:
                 for mem_data in data.get("memories", []):
                     if any(kw in mem_data.get("content", "").lower() for kw in query.lower().split()[:3]):
                         if mem_data.get("metadata", {}).get("reusable", True):
-                            results.append({
-                                "project_id": other_project_id,
-                                "content": mem_data["content"][:200],
-                                "type": mem_data.get("memory_type", "fact"),
-                                "relevance": 0.7,  # 模拟相关度
-                            })
+                            results.append(
+                                {
+                                    "project_id": other_project_id,
+                                    "content": mem_data["content"][:200],
+                                    "type": mem_data.get("memory_type", "fact"),
+                                    "relevance": 0.7,  # 模拟相关度
+                                }
+                            )
             except Exception:
                 continue
 
@@ -320,7 +322,7 @@ class MemoryManager:
         # 1. 合并相似实体
         entity_names = list(self._entities.keys())
         for i, name1 in enumerate(entity_names):
-            for name2 in entity_names[i + 1:]:
+            for name2 in entity_names[i + 1 :]:
                 if name1 in name2 or name2 in name1:
                     # 合并到更短的名称
                     keep = name1 if len(name1) < len(name2) else name2
@@ -334,7 +336,7 @@ class MemoryManager:
         # 2. 标记过时事实（相同主题的新事实标记旧事实）
         facts = [m for m in self._memories.values() if m.memory_type == "fact"]
         for i, f1 in enumerate(facts):
-            for f2 in facts[i + 1:]:
+            for f2 in facts[i + 1 :]:
                 if f1.content[:20] == f2.content[:20] and f1.created_at < f2.created_at:
                     f1.is_obsolete = True
                     f2.related_ids.append(f1.id)
@@ -403,15 +405,18 @@ class MemoryManager:
 
         # 关系抽取：匹配"A的B"模式
         import re
+
         relation_matches = re.findall(r"([^，。；的]{2,15})的([^，。；]{2,15})", content)
         for subj, obj in relation_matches[:5]:
-            self._relations.append({
-                "subject": subj.strip(),
-                "predicate": "的",
-                "object": obj.strip(),
-                "memory_id": memory_id,
-                "timestamp": time.time(),
-            })
+            self._relations.append(
+                {
+                    "subject": subj.strip(),
+                    "predicate": "的",
+                    "object": obj.strip(),
+                    "memory_id": memory_id,
+                    "timestamp": time.time(),
+                }
+            )
 
     def _save(self) -> None:
         """持久化到JSON文件"""

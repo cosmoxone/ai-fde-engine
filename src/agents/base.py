@@ -2,6 +2,7 @@
 Agent基类 - 基于Pydantic AI V2风格的类型安全Agent
 统一注入：记忆、工具、评测、护栏、可观测性等横切能力
 """
+
 from __future__ import annotations
 
 import json
@@ -12,13 +13,14 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from ..config import get_settings
-from ..memory import MemoryManager, get_memory_manager
 from ..llm import LLMClient, LLMMessage, get_llm_client
+from ..memory import MemoryManager, get_memory_manager
 
 
 @dataclass
 class AgentResult:
     """Agent执行结果"""
+
     success: bool
     content: str = ""
     structured_output: Optional[dict[str, Any]] = None
@@ -42,6 +44,7 @@ class AgentResult:
 @dataclass
 class AgentCapability:
     """Agent能力插件 - 对应Pydantic AI V2的Capability机制"""
+
     name: str
     description: str = ""
     # 钩子函数
@@ -186,12 +189,14 @@ class BaseAgent(ABC):
         """记录结束"""
         if hasattr(self, "_start_time"):
             result.duration_seconds = round(time.time() - self._start_time, 3)
-        result.metadata.update({
-            "agent_type": self.agent_type,
-            "agent_name": self.agent_name,
-            "agent_id": self.agent_id,
-            "project_id": self.project_id,
-        })
+        result.metadata.update(
+            {
+                "agent_type": self.agent_type,
+                "agent_name": self.agent_name,
+                "agent_id": self.agent_id,
+                "project_id": self.project_id,
+            }
+        )
         return result
 
     async def _execute_with_capabilities(self, input_data: dict[str, Any]) -> AgentResult:
@@ -202,9 +207,7 @@ class BaseAgent(ABC):
                 try:
                     await cap.before_run(self, input_data)
                 except Exception as e:
-                    input_data.setdefault("_capability_warnings", []).append(
-                        f"{cap.name}.before_run failed: {e}"
-                    )
+                    input_data.setdefault("_capability_warnings", []).append(f"{cap.name}.before_run failed: {e}")
 
         try:
             result = await self.run(input_data)
@@ -232,9 +235,7 @@ class BaseAgent(ABC):
                 try:
                     result = await cap.after_run(self, result)
                 except Exception as e:
-                    result.metadata.setdefault("_capability_warnings", []).append(
-                        f"{cap.name}.after_run failed: {e}"
-                    )
+                    result.metadata.setdefault("_capability_warnings", []).append(f"{cap.name}.after_run failed: {e}")
 
         # 记录到记忆
         if result.success:

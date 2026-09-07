@@ -1,14 +1,16 @@
 """
 Agent模块测试
 """
+
 import os
+
 import pytest
 
-from src.agents.base import BaseAgent, AgentResult, AgentCapability
-from src.agents.research import ResearchAgent
-from src.agents.design import DesignAgent
+from src.agents.base import AgentResult
 from src.agents.delivery import DeliveryAgent
+from src.agents.design import DesignAgent
 from src.agents.project import ProjectAgent
+from src.agents.research import ResearchAgent
 
 
 @pytest.fixture
@@ -67,10 +69,17 @@ class TestResearchAgent:
 
     @pytest.mark.asyncio
     async def test_run_with_documents(self, research_agent):
-        result = await research_agent.execute({
-            "documents": [{"filename": "业务手册.pdf", "content": "业务流程包括受理、审核、处理。审核标准包括完整性和合规性。"}],
-            "client_requirements": "需要一个智能审核助手",
-        })
+        result = await research_agent.execute(
+            {
+                "documents": [
+                    {
+                        "filename": "业务手册.pdf",
+                        "content": "业务流程包括受理、审核、处理。审核标准包括完整性和合规性。",
+                    }
+                ],
+                "client_requirements": "需要一个智能审核助手",
+            }
+        )
         assert result.success is True
         assert result.structured_output is not None
         assert "business_process" in result.structured_output
@@ -88,9 +97,11 @@ class TestResearchAgent:
 
     @pytest.mark.asyncio
     async def test_requirements_have_priority(self, research_agent):
-        result = await research_agent.execute({
-            "documents": [{"content": "测试业务文档"}],
-        })
+        result = await research_agent.execute(
+            {
+                "documents": [{"content": "测试业务文档"}],
+            }
+        )
         reqs = result.structured_output["requirements"]["functional"]
         assert len(reqs) > 0
         for req in reqs:
@@ -101,9 +112,11 @@ class TestResearchAgent:
 
     @pytest.mark.asyncio
     async def test_benchmark_has_categories(self, research_agent):
-        result = await research_agent.execute({
-            "documents": [{"content": "测试业务文档"}],
-        })
+        result = await research_agent.execute(
+            {
+                "documents": [{"content": "测试业务文档"}],
+            }
+        )
         bm = result.structured_output["benchmark"]
         assert "test_cases" in bm
         assert "acceptance_criteria" in bm
@@ -125,13 +138,15 @@ class TestDesignAgent:
 
     @pytest.mark.asyncio
     async def test_run_design(self, design_agent):
-        result = await design_agent.execute({
-            "requirements_baseline": {
-                "requirements": {"functional": [{"id": "R1", "title": "智能审核"}]},
-                "business_process": {"nodes": []},
-                "benchmark": {"test_cases": []},
-            },
-        })
+        result = await design_agent.execute(
+            {
+                "requirements_baseline": {
+                    "requirements": {"functional": [{"id": "R1", "title": "智能审核"}]},
+                    "business_process": {"nodes": []},
+                    "benchmark": {"test_cases": []},
+                },
+            }
+        )
         assert result.success is True
         assert "product_solution" in result.structured_output
         assert "tech_solution" in result.structured_output
@@ -164,12 +179,14 @@ class TestDeliveryAgent:
 
     @pytest.mark.asyncio
     async def test_generate_code(self, delivery_agent):
-        result = await delivery_agent.execute({
-            "task_type": "generate_code",
-            "tech_solution": {},
-            "requirements": [{"id": "R1", "title": "测试功能"}],
-            "project_name": "test_project",
-        })
+        result = await delivery_agent.execute(
+            {
+                "task_type": "generate_code",
+                "tech_solution": {},
+                "requirements": [{"id": "R1", "title": "测试功能"}],
+                "project_name": "test_project",
+            }
+        )
         assert result.success is True
         assert "workspace_path" in result.structured_output
         assert "files_generated" in result.structured_output
@@ -177,34 +194,40 @@ class TestDeliveryAgent:
 
     @pytest.mark.asyncio
     async def test_build_kb(self, delivery_agent):
-        result = await delivery_agent.execute({
-            "task_type": "build_kb",
-            "documents": [{"content": "测试文档"}],
-            "kb_name": "test_kb",
-        })
+        result = await delivery_agent.execute(
+            {
+                "task_type": "build_kb",
+                "documents": [{"content": "测试文档"}],
+                "kb_name": "test_kb",
+            }
+        )
         assert result.success is True
         assert result.structured_output["status"] == "ready"
 
     @pytest.mark.asyncio
     async def test_fix_badcase(self, delivery_agent):
-        result = await delivery_agent.execute({
-            "task_type": "fix_badcase",
-            "badcases": [
-                {"id": "B1", "input": "不知道答案", "actual_output": "未找到相关信息", "error_type": ""},
-                {"id": "B2", "input": "格式错误", "actual_output": "输出格式不对", "error_type": ""},
-            ],
-        })
+        result = await delivery_agent.execute(
+            {
+                "task_type": "fix_badcase",
+                "badcases": [
+                    {"id": "B1", "input": "不知道答案", "actual_output": "未找到相关信息", "error_type": ""},
+                    {"id": "B2", "input": "格式错误", "actual_output": "输出格式不对", "error_type": ""},
+                ],
+            }
+        )
         assert result.success is True
         assert "fixed_count" in result.structured_output
         assert "need_human_count" in result.structured_output
 
     @pytest.mark.asyncio
     async def test_nightly_iteration(self, delivery_agent):
-        result = await delivery_agent.execute({
-            "task_type": "nightly_iteration",
-            "badcases": [{"id": "B1", "input": "测试", "actual_output": "不知道", "severity": "major"}],
-            "iteration_number": 1,
-        })
+        result = await delivery_agent.execute(
+            {
+                "task_type": "nightly_iteration",
+                "badcases": [{"id": "B1", "input": "测试", "actual_output": "不知道", "severity": "major"}],
+                "iteration_number": 1,
+            }
+        )
         assert result.success is True
         assert "version" in result.structured_output
         assert "regression" in result.structured_output
@@ -231,14 +254,16 @@ class TestProjectAgent:
 
     @pytest.mark.asyncio
     async def test_progress_report(self, project_agent):
-        result = await project_agent.execute({
-            "task_type": "progress_report",
-            "project_data": {"name": "测试项目", "status": "research"},
-            "tasks": [
-                {"id": "T1", "title": "调研", "status": "completed"},
-                {"id": "T2", "title": "设计", "status": "running"},
-            ],
-        })
+        result = await project_agent.execute(
+            {
+                "task_type": "progress_report",
+                "project_data": {"name": "测试项目", "status": "research"},
+                "tasks": [
+                    {"id": "T1", "title": "调研", "status": "completed"},
+                    {"id": "T2", "title": "设计", "status": "running"},
+                ],
+            }
+        )
         assert result.success is True
         assert "overall_progress" in result.structured_output
         assert result.structured_output["overall_progress"] == 0.5
@@ -246,10 +271,12 @@ class TestProjectAgent:
 
     @pytest.mark.asyncio
     async def test_risk_alert(self, project_agent):
-        result = await project_agent.execute({
-            "task_type": "risk_alert",
-            "project_data": {"status": "iteration"},
-        })
+        result = await project_agent.execute(
+            {
+                "task_type": "risk_alert",
+                "project_data": {"status": "iteration"},
+            }
+        )
         assert result.success is True
         assert "risks" in result.structured_output
         assert len(result.structured_output["risks"]) > 0
@@ -271,12 +298,14 @@ class TestProjectAgent:
 
     @pytest.mark.asyncio
     async def test_asset_sediment(self, project_agent):
-        result = await project_agent.execute({
-            "task_type": "asset_sediment",
-            "assets": [
-                {"type": "best_practice", "content": "Benchmark前置可以减少需求扯皮", "reusable": True},
-                {"type": "component", "content": "通用文档解析组件", "reusable": True},
-            ],
-        })
+        result = await project_agent.execute(
+            {
+                "task_type": "asset_sediment",
+                "assets": [
+                    {"type": "best_practice", "content": "Benchmark前置可以减少需求扯皮", "reusable": True},
+                    {"type": "component", "content": "通用文档解析组件", "reusable": True},
+                ],
+            }
+        )
         assert result.success is True
         assert result.structured_output["sedimented_count"] == 2

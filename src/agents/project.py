@@ -2,12 +2,13 @@
 项目管控Agent - 负责进度跟踪、风险预警、文档生成、资产沉淀
 模型：Qwen3.6系列
 """
+
 from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
 
-from .base import BaseAgent, AgentResult
+from .base import AgentResult, BaseAgent
 
 
 class ProjectAgent(BaseAgent):
@@ -68,7 +69,9 @@ class ProjectAgent(BaseAgent):
         progress = completed / total if total > 0 else 0
 
         # 识别延期任务
-        delayed = [t for t in tasks if t.get("status") != "completed" and t.get("due_date", "") < str(datetime.now().date())]
+        delayed = [
+            t for t in tasks if t.get("status") != "completed" and t.get("due_date", "") < str(datetime.now().date())
+        ]
 
         report = {
             "project_id": self.project_id,
@@ -85,7 +88,7 @@ class ProjectAgent(BaseAgent):
 
         return AgentResult(
             success=True,
-            content=f"项目整体进度{progress*100:.0f}%，当前阶段[{report['current_phase']}]，健康状态[{report['health_status']}]。",
+            content=f"项目整体进度{progress * 100:.0f}%，当前阶段[{report['current_phase']}]，健康状态[{report['health_status']}]。",
             structured_output=report,
             metadata={"delayed_count": len(delayed)},
         )
@@ -99,7 +102,7 @@ class ProjectAgent(BaseAgent):
 
         return AgentResult(
             success=True,
-            content=f"识别出{len(risks)}个风险，其中高风险{sum(1 for r in risks if r['level']=='high')}个。",
+            content=f"识别出{len(risks)}个风险，其中高风险{sum(1 for r in risks if r['level'] == 'high')}个。",
             structured_output={"risks": risks, "alert_time": datetime.now().isoformat()},
             metadata={"high_risk_count": sum(1 for r in risks if r["level"] == "high")},
         )
@@ -110,10 +113,40 @@ class ProjectAgent(BaseAgent):
         # 基于规则的风险识别（实际用LLM）
         status = project_data.get("status", "research")
         if status == "research":
-            risks.append({"id": "R1", "risk": "客户文档不完整，可能影响需求准确性", "level": "medium", "probability": "medium", "impact": "需求基线质量下降", "mitigation": "主动向客户索要补充资料，设置人工审核节点", "owner": "FDE"})
+            risks.append(
+                {
+                    "id": "R1",
+                    "risk": "客户文档不完整，可能影响需求准确性",
+                    "level": "medium",
+                    "probability": "medium",
+                    "impact": "需求基线质量下降",
+                    "mitigation": "主动向客户索要补充资料，设置人工审核节点",
+                    "owner": "FDE",
+                }
+            )
         if status == "iteration":
-            risks.append({"id": "R2", "risk": "Badcase积累过多，夜间迭代可能无法全部修复", "level": "high", "probability": "high", "impact": "版本质量下降", "mitigation": "限制每轮迭代Badcase数量，优先修复高严重度问题", "owner": "FDE"})
-        risks.append({"id": "R3", "risk": "LLM API不稳定，可能影响交付进度", "level": "medium", "probability": "medium", "impact": "任务执行延迟", "mitigation": "多模型兜底+重试机制", "owner": "技术"})
+            risks.append(
+                {
+                    "id": "R2",
+                    "risk": "Badcase积累过多，夜间迭代可能无法全部修复",
+                    "level": "high",
+                    "probability": "high",
+                    "impact": "版本质量下降",
+                    "mitigation": "限制每轮迭代Badcase数量，优先修复高严重度问题",
+                    "owner": "FDE",
+                }
+            )
+        risks.append(
+            {
+                "id": "R3",
+                "risk": "LLM API不稳定，可能影响交付进度",
+                "level": "medium",
+                "probability": "medium",
+                "impact": "任务执行延迟",
+                "mitigation": "多模型兜底+重试机制",
+                "owner": "技术",
+            }
+        )
         return risks
 
     async def _weekly_report(self, input_data: dict[str, Any]) -> AgentResult:
@@ -153,9 +186,20 @@ class ProjectAgent(BaseAgent):
             "project_id": self.project_id,
             "goal_achievement": {"planned": "10天交付MVP", "actual": "12天交付MVP", "achievement_rate": 0.92},
             "what_went_well": ["AI主导调研大幅提升效率", "Benchmark前置有效减少需求扯皮", "夜间迭代机制验证可行"],
-            "what_to_improve": ["复杂业务规则理解仍需人工辅助", "代码生成质量在复杂场景不稳定", "记忆跨项目复用效果有待提升"],
-            "lessons_learned": ["验证前置是AI项目成功的关键", "AI主导+人工决策是当前最优模式", "记忆沉淀需要持续投入才能形成飞轮"],
-            "action_items": [{"action": "优化业务规则理解Prompt", "owner": "FDE", "priority": "high"}, {"action": "增加代码生成后的自动测试覆盖率", "owner": "技术", "priority": "medium"}],
+            "what_to_improve": [
+                "复杂业务规则理解仍需人工辅助",
+                "代码生成质量在复杂场景不稳定",
+                "记忆跨项目复用效果有待提升",
+            ],
+            "lessons_learned": [
+                "验证前置是AI项目成功的关键",
+                "AI主导+人工决策是当前最优模式",
+                "记忆沉淀需要持续投入才能形成飞轮",
+            ],
+            "action_items": [
+                {"action": "优化业务规则理解Prompt", "owner": "FDE", "priority": "high"},
+                {"action": "增加代码生成后的自动测试覆盖率", "owner": "技术", "priority": "medium"},
+            ],
         }
         return AgentResult(success=True, content="项目复盘报告已生成。", structured_output=retro)
 
@@ -166,22 +210,36 @@ class ProjectAgent(BaseAgent):
         for asset in assets:
             await self.memory.remember(
                 content=f"[资产沉淀-{asset.get('type', 'general')}] {asset.get('content', '')}",
-                metadata={"asset_type": asset.get("type"), "project_id": self.project_id, "reusable": asset.get("reusable", True)},
+                metadata={
+                    "asset_type": asset.get("type"),
+                    "project_id": self.project_id,
+                    "reusable": asset.get("reusable", True),
+                },
             )
             sediment_count += 1
 
         return AgentResult(
             success=True,
             content=f"已沉淀{sediment_count}项项目资产到记忆图谱，可跨项目复用。",
-            structured_output={"sedimented_count": sediment_count, "asset_types": list(set(a.get("type", "general") for a in assets))},
+            structured_output={
+                "sedimented_count": sediment_count,
+                "asset_types": list(set(a.get("type", "general") for a in assets)),
+            },
         )
 
     def _get_milestones(self, status: str) -> list[dict]:
         """获取关键里程碑"""
         milestones = {
             "research": [{"name": "需求基线确认", "status": "in_progress", "due": "Day3"}],
-            "design": [{"name": "需求基线确认", "status": "completed", "due": "Day3"}, {"name": "方案设计评审", "status": "in_progress", "due": "Day5"}],
-            "iteration": [{"name": "需求基线确认", "status": "completed"}, {"name": "方案设计评审", "status": "completed"}, {"name": "MVP首版交付", "status": "in_progress", "due": "Day10"}],
+            "design": [
+                {"name": "需求基线确认", "status": "completed", "due": "Day3"},
+                {"name": "方案设计评审", "status": "in_progress", "due": "Day5"},
+            ],
+            "iteration": [
+                {"name": "需求基线确认", "status": "completed"},
+                {"name": "方案设计评审", "status": "completed"},
+                {"name": "MVP首版交付", "status": "in_progress", "due": "Day10"},
+            ],
             "delivered": [{"name": "全部里程碑", "status": "completed"}],
         }
         return milestones.get(status, [])

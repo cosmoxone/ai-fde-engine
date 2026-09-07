@@ -2,11 +2,12 @@
 F7自助交付模块测试
 覆盖：SelfServiceAgent + 自助交付API端点 + 后台Review + 纠偏检测
 """
+
 import pytest
 from fastapi.testclient import TestClient
 
+from src.agents.self_service import SelfServiceAgent
 from src.main import app
-from src.agents.self_service import SelfServiceAgent, GuidanceStep, AIOpportunity, ValueMetric
 
 
 @pytest.fixture
@@ -17,12 +18,15 @@ def client():
 
 @pytest.fixture
 def project(client):
-    resp = client.post("/api/v1/projects", json={
-        "name": "自助交付测试项目",
-        "client_name": "测试客户",
-        "industry": "电子商务",
-        "description": "自助交付模块测试"
-    })
+    resp = client.post(
+        "/api/v1/projects",
+        json={
+            "name": "自助交付测试项目",
+            "client_name": "测试客户",
+            "industry": "电子商务",
+            "description": "自助交付模块测试",
+        },
+    )
     return resp.json().get("project", {}).get("id")
 
 
@@ -34,6 +38,7 @@ def agent(project):
 # ============================================================
 # SelfServiceAgent 单元测试
 # ============================================================
+
 
 class TestSelfServiceAgentInit:
     """Agent初始化测试"""
@@ -105,12 +110,14 @@ class TestOpportunityIdentification:
     @pytest.mark.asyncio
     async def test_identify_opportunities(self, agent):
         """测试识别AI落地机会"""
-        result = await agent.run({
-            "task_type": "identify_opportunities",
-            "business_description": "电商客服系统，日均5万条咨询",
-            "industry": "电子商务",
-            "pain_points": ["人工客服成本高", "响应时间长"],
-        })
+        result = await agent.run(
+            {
+                "task_type": "identify_opportunities",
+                "business_description": "电商客服系统，日均5万条咨询",
+                "industry": "电子商务",
+                "pain_points": ["人工客服成本高", "响应时间长"],
+            }
+        )
         assert result.success
         assert len(result.structured_output["opportunities"]) > 0
         opp = result.structured_output["opportunities"][0]
@@ -121,10 +128,12 @@ class TestOpportunityIdentification:
     @pytest.mark.asyncio
     async def test_opportunity_has_recommendation(self, agent):
         """测试机会识别返回推荐机会"""
-        result = await agent.run({
-            "task_type": "identify_opportunities",
-            "business_description": "测试业务",
-        })
+        result = await agent.run(
+            {
+                "task_type": "identify_opportunities",
+                "business_description": "测试业务",
+            }
+        )
         assert result.structured_output["recommended_opportunity"] is not None
 
 
@@ -134,10 +143,12 @@ class TestRequirementGuidance:
     @pytest.mark.asyncio
     async def test_generate_requirement_draft(self, agent):
         """测试生成需求初稿"""
-        result = await agent.run({
-            "task_type": "guide_requirement",
-            "action": "generate_draft",
-        })
+        result = await agent.run(
+            {
+                "task_type": "guide_requirement",
+                "action": "generate_draft",
+            }
+        )
         assert result.success
         assert "requirement_draft" in result.structured_output
         assert len(result.structured_output["requirement_draft"]["requirements"]) > 0
@@ -145,12 +156,14 @@ class TestRequirementGuidance:
     @pytest.mark.asyncio
     async def test_confirm_requirement(self, agent):
         """测试确认需求基线"""
-        result = await agent.run({
-            "task_type": "guide_requirement",
-            "action": "confirm",
-            "requirement_draft": {"test": "data"},
-            "user_feedback": "确认无误",
-        })
+        result = await agent.run(
+            {
+                "task_type": "guide_requirement",
+                "action": "confirm",
+                "requirement_draft": {"test": "data"},
+                "user_feedback": "确认无误",
+            }
+        )
         assert result.success
         assert result.structured_output["confirmed"] is True
         assert result.structured_output["baseline_version"] == "v1.0"
@@ -158,24 +171,28 @@ class TestRequirementGuidance:
     @pytest.mark.asyncio
     async def test_modify_requirement(self, agent):
         """测试修改需求"""
-        result = await agent.run({
-            "task_type": "guide_requirement",
-            "action": "modify",
-            "requirement_draft": {"R1": {"title": "原标题"}},
-            "modified_requirements": {"R1": {"title": "新标题"}},
-        })
+        result = await agent.run(
+            {
+                "task_type": "guide_requirement",
+                "action": "modify",
+                "requirement_draft": {"R1": {"title": "原标题"}},
+                "modified_requirements": {"R1": {"title": "新标题"}},
+            }
+        )
         assert result.success
         assert result.structured_output["requirement_draft"]["R1"]["title"] == "新标题"
 
     @pytest.mark.asyncio
     async def test_add_requirement(self, agent):
         """测试补充需求"""
-        result = await agent.run({
-            "task_type": "guide_requirement",
-            "action": "add",
-            "requirement_draft": {"requirements": [{"id": "R1"}]},
-            "new_requirements": [{"id": "R4", "title": "新需求"}],
-        })
+        result = await agent.run(
+            {
+                "task_type": "guide_requirement",
+                "action": "add",
+                "requirement_draft": {"requirements": [{"id": "R1"}]},
+                "new_requirements": [{"id": "R4", "title": "新需求"}],
+            }
+        )
         assert result.success
         assert result.structured_output["added_items"][0]["id"] == "R4"
 
@@ -186,12 +203,14 @@ class TestSolutionConfiguration:
     @pytest.mark.asyncio
     async def test_configure_solution(self, agent):
         """测试方案配置"""
-        result = await agent.run({
-            "task_type": "configure_solution",
-            "selected_modules": ["智能客服", "知识库问答"],
-            "deployment_mode": "saas",
-            "integration_level": "basic",
-        })
+        result = await agent.run(
+            {
+                "task_type": "configure_solution",
+                "selected_modules": ["智能客服", "知识库问答"],
+                "deployment_mode": "saas",
+                "integration_level": "basic",
+            }
+        )
         assert result.success
         assert "solution" in result.structured_output
         assert "cost_estimate" in result.structured_output["solution"]
@@ -199,12 +218,14 @@ class TestSolutionConfiguration:
     @pytest.mark.asyncio
     async def test_solution_cost_calculation(self, agent):
         """测试方案成本估算"""
-        result = await agent.run({
-            "task_type": "configure_solution",
-            "selected_modules": ["A", "B", "C"],
-            "deployment_mode": "private",
-            "integration_level": "deep",
-        })
+        result = await agent.run(
+            {
+                "task_type": "configure_solution",
+                "selected_modules": ["A", "B", "C"],
+                "deployment_mode": "private",
+                "integration_level": "deep",
+            }
+        )
         cost = result.structured_output["solution"]["cost_estimate"]
         assert cost["development"] > 0
         assert cost["annual_total"] > cost["development"]
@@ -216,11 +237,13 @@ class TestPrototypeGeneration:
     @pytest.mark.asyncio
     async def test_generate_prototype(self, agent):
         """测试生成原型"""
-        result = await agent.run({
-            "task_type": "generate_prototype",
-            "prototype_type": "knowledge_base_qa",
-            "config": {"name": "测试原型"},
-        })
+        result = await agent.run(
+            {
+                "task_type": "generate_prototype",
+                "prototype_type": "knowledge_base_qa",
+                "config": {"name": "测试原型"},
+            }
+        )
         assert result.success
         proto = result.structured_output["prototype"]
         assert proto["status"] == "ready"
@@ -234,12 +257,14 @@ class TestValueCalculation:
     @pytest.mark.asyncio
     async def test_calculate_value(self, agent):
         """测试价值计算"""
-        result = await agent.run({
-            "task_type": "calculate_value",
-            "baseline": {"review_time": 30, "cs_cost": 200000},
-            "current": {"review_time": 9, "cs_cost": 80000},
-            "investment": 100000,
-        })
+        result = await agent.run(
+            {
+                "task_type": "calculate_value",
+                "baseline": {"review_time": 30, "cs_cost": 200000},
+                "current": {"review_time": 9, "cs_cost": 80000},
+                "investment": 100000,
+            }
+        )
         assert result.success
         metrics = result.structured_output["metrics"]
         assert len(metrics) == 4
@@ -262,43 +287,55 @@ class TestDeviationDetection:
 
     def test_detect_vague_requirements(self, agent):
         """测试检测模糊需求"""
-        alerts = agent._detect_deviations({
-            "requirements": [
-                {"description": "短"}, {"description": "也短"}, {"description": "这个描述足够长足够详细"},
-            ]
-        })
+        alerts = agent._detect_deviations(
+            {
+                "requirements": [
+                    {"description": "短"},
+                    {"description": "也短"},
+                    {"description": "这个描述足够长足够详细"},
+                ]
+            }
+        )
         assert any(a["type"] == "vague_requirement" for a in alerts)
 
     def test_detect_scope_creep(self, agent):
         """测试检测范围蔓延（功能模块过多）"""
-        alerts = agent._detect_deviations({
-            "selected_modules": ["A", "B", "C", "D", "E", "F"],
-        })
+        alerts = agent._detect_deviations(
+            {
+                "selected_modules": ["A", "B", "C", "D", "E", "F"],
+            }
+        )
         assert any(a["type"] == "scope_creep" for a in alerts)
         assert any(a["severity"] == "high" for a in alerts)
 
     def test_detect_budget_mismatch(self, agent):
         """测试检测预算不匹配"""
-        alerts = agent._detect_deviations({
-            "selected_modules": ["A", "B", "C", "D"],
-            "budget": 30000,
-        })
+        alerts = agent._detect_deviations(
+            {
+                "selected_modules": ["A", "B", "C", "D"],
+                "budget": 30000,
+            }
+        )
         assert any(a["type"] == "budget_mismatch" for a in alerts)
 
     def test_detect_skipped_critical_step(self, agent):
         """测试检测跳过关键步骤"""
-        alerts = agent._detect_deviations({
-            "skipped_steps": ["requirement", "solution"],
-        })
+        alerts = agent._detect_deviations(
+            {
+                "skipped_steps": ["requirement", "solution"],
+            }
+        )
         assert any(a["type"] == "skipped_critical_step" for a in alerts)
 
     def test_no_deviation_for_normal_input(self, agent):
         """测试正常输入不产生纠偏"""
-        alerts = agent._detect_deviations({
-            "selected_modules": ["A", "B"],
-            "budget": 100000,
-            "requirements": [{"description": "这是一个足够详细的需求描述，包含了具体的功能说明和使用场景"}],
-        })
+        alerts = agent._detect_deviations(
+            {
+                "selected_modules": ["A", "B"],
+                "budget": 100000,
+                "requirements": [{"description": "这是一个足够详细的需求描述，包含了具体的功能说明和使用场景"}],
+            }
+        )
         assert len(alerts) == 0
 
 
@@ -308,13 +345,15 @@ class TestFeedbackSubmission:
     @pytest.mark.asyncio
     async def test_submit_feedback(self, agent):
         """测试提交反馈"""
-        result = await agent.run({
-            "task_type": "submit_feedback",
-            "feedback_type": "bug",
-            "content": "问答结果不准确",
-            "rating": 2,
-            "prototype_id": "proto-test",
-        })
+        result = await agent.run(
+            {
+                "task_type": "submit_feedback",
+                "feedback_type": "bug",
+                "content": "问答结果不准确",
+                "rating": 2,
+                "prototype_id": "proto-test",
+            }
+        )
         assert result.success
         fb = result.structured_output["feedback"]
         assert fb["type"] == "bug"
@@ -324,18 +363,21 @@ class TestFeedbackSubmission:
     @pytest.mark.asyncio
     async def test_general_feedback_priority(self, agent):
         """测试普通反馈优先级为medium"""
-        result = await agent.run({
-            "task_type": "submit_feedback",
-            "feedback_type": "general",
-            "content": "建议增加导出功能",
-            "rating": 4,
-        })
+        result = await agent.run(
+            {
+                "task_type": "submit_feedback",
+                "feedback_type": "general",
+                "content": "建议增加导出功能",
+                "rating": 4,
+            }
+        )
         assert result.structured_output["priority"] == "medium"
 
 
 # ============================================================
 # F7 API端点测试
 # ============================================================
+
 
 class TestF7API:
     """F7自助交付API测试"""
@@ -358,7 +400,7 @@ class TestF7API:
         """测试AI落地机会识别API"""
         resp = client.post(
             f"/api/v1/projects/{project}/self-service/opportunities",
-            json={"business_description": "电商客服系统", "industry": "电商"}
+            json={"business_description": "电商客服系统", "industry": "电商"},
         )
         assert resp.status_code == 200
         assert resp.json()["success"] is True
@@ -366,10 +408,7 @@ class TestF7API:
 
     def test_requirement_guide_api(self, client, project):
         """测试需求自助梳理API"""
-        resp = client.post(
-            f"/api/v1/projects/{project}/self-service/requirements",
-            json={"action": "generate_draft"}
-        )
+        resp = client.post(f"/api/v1/projects/{project}/self-service/requirements", json={"action": "generate_draft"})
         assert resp.status_code == 200
         data = resp.json()
         assert data["success"] is True
@@ -379,7 +418,7 @@ class TestF7API:
         """测试需求确认API"""
         resp = client.post(
             f"/api/v1/projects/{project}/self-service/requirements",
-            json={"action": "confirm", "requirement_draft": {"test": True}}
+            json={"action": "confirm", "requirement_draft": {"test": True}},
         )
         assert resp.status_code == 200
         assert resp.json()["result"]["confirmed"] is True
@@ -388,7 +427,7 @@ class TestF7API:
         """测试方案配置API"""
         resp = client.post(
             f"/api/v1/projects/{project}/self-service/solution",
-            json={"selected_modules": ["智能客服"], "deployment_mode": "saas"}
+            json={"selected_modules": ["智能客服"], "deployment_mode": "saas"},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -400,7 +439,7 @@ class TestF7API:
         """测试方案配置触发范围蔓延纠偏"""
         resp = client.post(
             f"/api/v1/projects/{project}/self-service/solution",
-            json={"selected_modules": ["A", "B", "C", "D", "E", "F"], "budget": 100000}
+            json={"selected_modules": ["A", "B", "C", "D", "E", "F"], "budget": 100000},
         )
         assert resp.status_code == 200
         alerts = resp.json()["deviation_alerts"]
@@ -410,7 +449,7 @@ class TestF7API:
         """测试原型生成API"""
         resp = client.post(
             f"/api/v1/projects/{project}/self-service/prototype",
-            json={"prototype_type": "knowledge_base_qa", "config": {"name": "测试"}}
+            json={"prototype_type": "knowledge_base_qa", "config": {"name": "测试"}},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -430,7 +469,7 @@ class TestF7API:
         """测试价值计算API"""
         resp = client.post(
             f"/api/v1/projects/{project}/self-service/value/calculate",
-            json={"baseline": {}, "current": {}, "investment": 100000}
+            json={"baseline": {}, "current": {}, "investment": 100000},
         )
         assert resp.status_code == 200
         assert resp.json()["success"] is True
@@ -439,7 +478,7 @@ class TestF7API:
         """测试反馈提交API"""
         resp = client.post(
             f"/api/v1/projects/{project}/self-service/feedback",
-            json={"feedback_type": "bug", "content": "测试bug", "rating": 2}
+            json={"feedback_type": "bug", "content": "测试bug", "rating": 2},
         )
         assert resp.status_code == 200
         assert resp.json()["success"] is True
@@ -448,8 +487,7 @@ class TestF7API:
         """测试反馈列表API"""
         # 先提交一个反馈
         client.post(
-            f"/api/v1/projects/{project}/self-service/feedback",
-            json={"feedback_type": "general", "content": "测试"}
+            f"/api/v1/projects/{project}/self-service/feedback", json={"feedback_type": "general", "content": "测试"}
         )
         resp = client.get(f"/api/v1/projects/{project}/self-service/feedback")
         assert resp.status_code == 200
@@ -459,7 +497,7 @@ class TestF7API:
         """测试完成步骤API"""
         resp = client.post(
             f"/api/v1/projects/{project}/self-service/complete-step",
-            json={"step_id": "enlightenment", "confirmation": True}
+            json={"step_id": "enlightenment", "confirmation": True},
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -471,7 +509,7 @@ class TestF7API:
         """测试未确认完成步骤失败"""
         resp = client.post(
             f"/api/v1/projects/{project}/self-service/complete-step",
-            json={"step_id": "enlightenment", "confirmation": False}
+            json={"step_id": "enlightenment", "confirmation": False},
         )
         assert resp.status_code == 400
 
@@ -502,8 +540,7 @@ class TestF7ReviewAPI:
     def test_review_action_nonexistent(self, client):
         """测试不存在的审核项操作"""
         resp = client.post(
-            "/api/v1/self-service/review/nonexistent/action",
-            json={"action": "approve", "comment": "通过"}
+            "/api/v1/self-service/review/nonexistent/action", json={"action": "approve", "comment": "通过"}
         )
         assert resp.status_code == 404
 
@@ -511,6 +548,7 @@ class TestF7ReviewAPI:
 # ============================================================
 # 端到端流程测试
 # ============================================================
+
 
 class TestF7EndToEnd:
     """F7自助交付端到端流程测试"""
@@ -520,15 +558,12 @@ class TestF7EndToEnd:
         # 1. AI落地机会识别
         resp = client.post(
             f"/api/v1/projects/{project}/self-service/opportunities",
-            json={"business_description": "电商客服", "industry": "电商"}
+            json={"business_description": "电商客服", "industry": "电商"},
         )
         assert resp.status_code == 200
 
         # 2. 需求自助梳理 - 生成初稿
-        resp = client.post(
-            f"/api/v1/projects/{project}/self-service/requirements",
-            json={"action": "generate_draft"}
-        )
+        resp = client.post(f"/api/v1/projects/{project}/self-service/requirements", json={"action": "generate_draft"})
         assert resp.status_code == 200
         draft = resp.json()["result"]["requirement_draft"]
         assert len(draft["requirements"]) > 0
@@ -536,7 +571,7 @@ class TestF7EndToEnd:
         # 3. 确认需求
         resp = client.post(
             f"/api/v1/projects/{project}/self-service/requirements",
-            json={"action": "confirm", "requirement_draft": draft}
+            json={"action": "confirm", "requirement_draft": draft},
         )
         assert resp.status_code == 200
         assert resp.json()["result"]["confirmed"] is True
@@ -544,31 +579,27 @@ class TestF7EndToEnd:
         # 4. 方案配置
         resp = client.post(
             f"/api/v1/projects/{project}/self-service/solution",
-            json={"selected_modules": ["智能客服", "知识库"], "deployment_mode": "saas"}
+            json={"selected_modules": ["智能客服", "知识库"], "deployment_mode": "saas"},
         )
         assert resp.status_code == 200
         assert "cost_estimate" in resp.json()["result"]["solution"]
 
         # 5. 原型生成
         resp = client.post(
-            f"/api/v1/projects/{project}/self-service/prototype",
-            json={"prototype_type": "knowledge_base_qa"}
+            f"/api/v1/projects/{project}/self-service/prototype", json={"prototype_type": "knowledge_base_qa"}
         )
         assert resp.status_code == 200
         assert resp.json()["result"]["prototype"]["status"] == "ready"
 
         # 6. 价值计算
-        resp = client.post(
-            f"/api/v1/projects/{project}/self-service/value/calculate",
-            json={"investment": 100000}
-        )
+        resp = client.post(f"/api/v1/projects/{project}/self-service/value/calculate", json={"investment": 100000})
         assert resp.status_code == 200
         assert resp.json()["result"]["summary"]["average_improvement"] > 0
 
         # 7. 提交反馈
         resp = client.post(
             f"/api/v1/projects/{project}/self-service/feedback",
-            json={"feedback_type": "praise", "content": "体验很好", "rating": 5}
+            json={"feedback_type": "praise", "content": "体验很好", "rating": 5},
         )
         assert resp.status_code == 200
 
@@ -576,7 +607,7 @@ class TestF7EndToEnd:
         for step_id in ["enlightenment", "requirement", "solution", "prototype", "decision"]:
             resp = client.post(
                 f"/api/v1/projects/{project}/self-service/complete-step",
-                json={"step_id": step_id, "confirmation": True}
+                json={"step_id": step_id, "confirmation": True},
             )
             assert resp.status_code == 200
 

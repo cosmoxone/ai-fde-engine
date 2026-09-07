@@ -1,11 +1,12 @@
 """Agent模块"""
-from .base import BaseAgent, AgentResult, AgentCapability
-from .research import ResearchAgent
-from .design import DesignAgent
+
+from .base import AgentCapability, AgentResult, BaseAgent
 from .delivery import DeliveryAgent
+from .design import DesignAgent
 from .project import ProjectAgent
-from .self_service import SelfServiceAgent, GuidanceStep, AIOpportunity, ValueMetric
-from .training import TrainingAgent, CompetencyScore, LearningPath
+from .research import ResearchAgent
+from .self_service import AIOpportunity, GuidanceStep, SelfServiceAgent, ValueMetric
+from .training import CompetencyScore, LearningPath, TrainingAgent
 
 __all__ = [
     "BaseAgent",

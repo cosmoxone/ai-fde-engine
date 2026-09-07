@@ -1,11 +1,12 @@
 """
 记忆模块测试
 """
-import os
-import pytest
-import tempfile
 
-from src.memory import MemoryManager, MemoryItem
+import os
+
+import pytest
+
+from src.memory import MemoryItem, MemoryManager
 
 
 @pytest.fixture

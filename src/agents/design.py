@@ -2,11 +2,12 @@
 方案设计Agent - 负责产品方案、技术方案、验证方案的并行生成
 模型：DeepSeek V4 Pro（逻辑推理+代码生成一体化）
 """
+
 from __future__ import annotations
 
 from typing import Any
 
-from .base import BaseAgent, AgentResult
+from .base import AgentResult, BaseAgent
 
 
 class DesignAgent(BaseAgent):
@@ -59,9 +60,7 @@ class DesignAgent(BaseAgent):
         memory_context = input_data.get("_memory_context", "")
 
         # 1. 三方案并行设计
-        design_result = await self._perform_design(
-            requirements, business_process, benchmark, memory_context
-        )
+        design_result = await self._perform_design(requirements, business_process, benchmark, memory_context)
 
         # 2. 交叉校验
         cross_check = self._cross_validate(design_result)
@@ -104,12 +103,48 @@ class DesignAgent(BaseAgent):
     F --> I[人工复核台]
     I --> J[运营管理后台]""",
                 "features": [
-                    {"id": "F1", "name": "智能资料审核", "module": "智能审核引擎", "description": "自动审核资料完整性与合规性", "priority": "P0"},
-                    {"id": "F2", "name": "业务处理建议", "module": "业务处理助手", "description": "基于规则和案例提供处理建议", "priority": "P0"},
-                    {"id": "F3", "name": "知识库问答", "module": "知识库问答模块", "description": "自然语言查询业务知识", "priority": "P1"},
-                    {"id": "F4", "name": "结果反馈生成", "module": "结果反馈模块", "description": "自动生成客户通知与归档", "priority": "P1"},
-                    {"id": "F5", "name": "人工复核台", "module": "人工复核台", "description": "AI结果人工审核与修正", "priority": "P0"},
-                    {"id": "F6", "name": "运营管理后台", "module": "运营管理后台", "description": "系统配置、数据统计、用户管理", "priority": "P1"},
+                    {
+                        "id": "F1",
+                        "name": "智能资料审核",
+                        "module": "智能审核引擎",
+                        "description": "自动审核资料完整性与合规性",
+                        "priority": "P0",
+                    },
+                    {
+                        "id": "F2",
+                        "name": "业务处理建议",
+                        "module": "业务处理助手",
+                        "description": "基于规则和案例提供处理建议",
+                        "priority": "P0",
+                    },
+                    {
+                        "id": "F3",
+                        "name": "知识库问答",
+                        "module": "知识库问答模块",
+                        "description": "自然语言查询业务知识",
+                        "priority": "P1",
+                    },
+                    {
+                        "id": "F4",
+                        "name": "结果反馈生成",
+                        "module": "结果反馈模块",
+                        "description": "自动生成客户通知与归档",
+                        "priority": "P1",
+                    },
+                    {
+                        "id": "F5",
+                        "name": "人工复核台",
+                        "module": "人工复核台",
+                        "description": "AI结果人工审核与修正",
+                        "priority": "P0",
+                    },
+                    {
+                        "id": "F6",
+                        "name": "运营管理后台",
+                        "module": "运营管理后台",
+                        "description": "系统配置、数据统计、用户管理",
+                        "priority": "P1",
+                    },
                 ],
                 "interaction_flows": [
                     "客户提交资料 → 智能审核 → 审核结果反馈 → 人工确认 → 业务处理",
@@ -130,16 +165,40 @@ class DesignAgent(BaseAgent):
             "tech_solution": {
                 "tech_stack": {
                     "frontend": {"framework": "React 18 + TypeScript", "ui": "Ant Design 5", "state": "Zustand"},
-                    "backend": {"framework": "FastAPI + Python 3.11", "agent": "Pydantic AI V2", "orm": "SQLAlchemy 2.0"},
+                    "backend": {
+                        "framework": "FastAPI + Python 3.11",
+                        "agent": "Pydantic AI V2",
+                        "orm": "SQLAlchemy 2.0",
+                    },
                     "ai": {"models": "DeepSeek V4 Pro + Qwen3.6", "kb": "LightRAG + Qdrant", "doc_parser": "Marker v2"},
                     "data": {"database": "PostgreSQL 16 + pgvector", "cache": "Redis 7", "storage": "MinIO"},
-                    "devops": {"container": "Docker + Docker Compose", "ci_cd": "GitHub Actions", "monitor": "LangFuse"},
+                    "devops": {
+                        "container": "Docker + Docker Compose",
+                        "ci_cd": "GitHub Actions",
+                        "monitor": "LangFuse",
+                    },
                 },
                 "selection_rationale": [
-                    {"component": "LightRAG", "choice": "vs 微软GraphRAG", "reason": "索引成本低80%，增量更新，部署简单，适合MVP快速迭代"},
-                    {"component": "Qdrant", "choice": "vs Milvus", "reason": "Rust高性能，多租户，运维简单，FDE项目规模足够"},
-                    {"component": "Pydantic AI V2", "choice": "vs LangGraph/CrewAI", "reason": "类型安全，Capabilities可组合，生产级持久化，减少输出不可控"},
-                    {"component": "Marker v2", "choice": "vs Docling", "reason": "GPU 7.4页/秒，总分76.0超Docling 50.3，速度快2倍"},
+                    {
+                        "component": "LightRAG",
+                        "choice": "vs 微软GraphRAG",
+                        "reason": "索引成本低80%，增量更新，部署简单，适合MVP快速迭代",
+                    },
+                    {
+                        "component": "Qdrant",
+                        "choice": "vs Milvus",
+                        "reason": "Rust高性能，多租户，运维简单，FDE项目规模足够",
+                    },
+                    {
+                        "component": "Pydantic AI V2",
+                        "choice": "vs LangGraph/CrewAI",
+                        "reason": "类型安全，Capabilities可组合，生产级持久化，减少输出不可控",
+                    },
+                    {
+                        "component": "Marker v2",
+                        "choice": "vs Docling",
+                        "reason": "GPU 7.4页/秒，总分76.0超Docling 50.3，速度快2倍",
+                    },
                 ],
                 "architecture_mermaid": """graph TB
     subgraph 接入层
@@ -173,11 +232,36 @@ class DesignAgent(BaseAgent):
     API --> Redis""",
                 "data_flow": "文档上传 → Marker解析 → LightRAG建图谱 → Qdrant存向量；用户请求 → Agent检索知识库 → 生成回答 → DeepEval评测 → 记录记忆图谱",
                 "interfaces": [
-                    {"name": "文档上传API", "method": "POST", "path": "/api/v1/projects/{id}/documents", "description": "上传业务文档"},
-                    {"name": "知识库问答API", "method": "POST", "path": "/api/v1/projects/{id}/kb/query", "description": "知识库自然语言问答"},
-                    {"name": "智能审核API", "method": "POST", "path": "/api/v1/projects/{id}/review", "description": "提交资料智能审核"},
-                    {"name": "Benchmark评测API", "method": "POST", "path": "/api/v1/projects/{id}/benchmarks/{bid}/run", "description": "跑Benchmark评测"},
-                    {"name": "迭代触发API", "method": "POST", "path": "/api/v1/projects/{id}/iteration/run", "description": "触发夜间迭代"},
+                    {
+                        "name": "文档上传API",
+                        "method": "POST",
+                        "path": "/api/v1/projects/{id}/documents",
+                        "description": "上传业务文档",
+                    },
+                    {
+                        "name": "知识库问答API",
+                        "method": "POST",
+                        "path": "/api/v1/projects/{id}/kb/query",
+                        "description": "知识库自然语言问答",
+                    },
+                    {
+                        "name": "智能审核API",
+                        "method": "POST",
+                        "path": "/api/v1/projects/{id}/review",
+                        "description": "提交资料智能审核",
+                    },
+                    {
+                        "name": "Benchmark评测API",
+                        "method": "POST",
+                        "path": "/api/v1/projects/{id}/benchmarks/{bid}/run",
+                        "description": "跑Benchmark评测",
+                    },
+                    {
+                        "name": "迭代触发API",
+                        "method": "POST",
+                        "path": "/api/v1/projects/{id}/iteration/run",
+                        "description": "触发夜间迭代",
+                    },
                 ],
                 "deployment": {
                     "mode": "Docker Compose单机部署",
@@ -186,8 +270,16 @@ class DesignAgent(BaseAgent):
                     "scaling": "MVP单机，生产可拆分为微服务+K8s",
                 },
                 "risks": [
-                    {"risk": "LLM API不稳定", "impact": "服务响应延迟或失败", "mitigation": "多模型兜底+重试机制+本地模型备选"},
-                    {"risk": "知识库效果不达预期", "impact": "问答准确率低", "mitigation": "LightRAG+人工校对+持续迭代优化"},
+                    {
+                        "risk": "LLM API不稳定",
+                        "impact": "服务响应延迟或失败",
+                        "mitigation": "多模型兜底+重试机制+本地模型备选",
+                    },
+                    {
+                        "risk": "知识库效果不达预期",
+                        "impact": "问答准确率低",
+                        "mitigation": "LightRAG+人工校对+持续迭代优化",
+                    },
                     {"risk": "客户数据安全", "impact": "数据泄露风险", "mitigation": "私有化部署+加密+权限隔离+沙箱"},
                 ],
             },
@@ -211,9 +303,14 @@ class DesignAgent(BaseAgent):
                 },
                 "evaluation_metrics": ["准确率", "幻觉率", "召回率", "响应时间", "Token成本", "用户满意度"],
                 "launch_checklist": [
-                    "功能测试全部通过", "性能测试达标", "安全审计通过",
-                    "Benchmark验收通过", "部署文档齐全", "用户培训完成",
-                    "回滚方案验证", "监控告警配置",
+                    "功能测试全部通过",
+                    "性能测试达标",
+                    "安全审计通过",
+                    "Benchmark验收通过",
+                    "部署文档齐全",
+                    "用户培训完成",
+                    "回滚方案验证",
+                    "监控告警配置",
                 ],
             },
             "code_skeleton": {
@@ -240,7 +337,12 @@ class DesignAgent(BaseAgent):
 │   ├── Dockerfile
 │   └── nginx.conf
 └── docs/                   # 项目文档""",
-                "core_modules": ["agents/", "services/kb_service.py", "services/review_service.py", "api/v1/endpoints.py"],
+                "core_modules": [
+                    "agents/",
+                    "services/kb_service.py",
+                    "services/review_service.py",
+                    "api/v1/endpoints.py",
+                ],
                 "config_templates": ["docker-compose.yml", ".env.example", "alembic.ini"],
             },
         }

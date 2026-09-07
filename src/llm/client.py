@@ -1,6 +1,7 @@
 """
 LLM客户端 - 支持OpenAI兼容API（DeepSeek、Qwen、本地vLLM等）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -148,8 +149,8 @@ class LLMClient:
                     self._call_count += 1
                     return result
                 elif response.status_code in (429, 500, 502, 503, 504):
-                    await asyncio.sleep(2 ** attempt)
-                    last_error = f"HTTP {response.status_code}, attempt {attempt+1}"
+                    await asyncio.sleep(2**attempt)
+                    last_error = f"HTTP {response.status_code}, attempt {attempt + 1}"
                 else:
                     return LLMResponse(
                         content=f"[LLM_ERROR] HTTP {response.status_code}: {response.text[:500]}",
@@ -158,8 +159,8 @@ class LLMClient:
                         finish_reason="error",
                     )
             except (httpx.TimeoutException, httpx.ConnectError) as e:
-                await asyncio.sleep(2 ** attempt)
-                last_error = f"{type(e).__name__}: {str(e)}, attempt {attempt+1}"
+                await asyncio.sleep(2**attempt)
+                last_error = f"{type(e).__name__}: {str(e)}, attempt {attempt + 1}"
             except Exception as e:
                 last_error = f"{type(e).__name__}: {str(e)}"
                 break
@@ -180,14 +181,21 @@ class LLMClient:
     ) -> tuple[LLMResponse, dict]:
         response_format = {"type": "json_object"}
         if schema:
-            schema_text = f"\n\n请严格按以下JSON结构输出：\n```json\n{json.dumps(schema, ensure_ascii=False, indent=2)}\n```"
+            schema_text = (
+                f"\n\n请严格按以下JSON结构输出：\n```json\n{json.dumps(schema, ensure_ascii=False, indent=2)}\n```"
+            )
             if messages and messages[-1].role == "user":
                 messages[-1].content += schema_text
             else:
                 messages.append(LLMMessage("user", schema_text))
 
-        response = await self.chat(messages=messages, model=model, temperature=temperature,
-                                    max_tokens=max_tokens, response_format=response_format)
+        response = await self.chat(
+            messages=messages,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            response_format=response_format,
+        )
         return response, response.parse_json()
 
     def _mock_chat(self, messages: list[LLMMessage], model: str) -> LLMResponse:

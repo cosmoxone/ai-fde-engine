@@ -2,10 +2,11 @@
 评测引擎 - 基于DeepEval的断言式评测
 MVP阶段使用模拟评测，生产环境调用DeepEval
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 from ..config import get_settings
 
@@ -13,6 +14,7 @@ from ..config import get_settings
 @dataclass
 class EvaluationResult:
     """评测结果"""
+
     accuracy: float = 0.0
     hallucination_rate: float = 0.0
     recall_rate: float = 0.0
@@ -83,11 +85,13 @@ class Evaluator:
 
     def add_assertion(self, name: str, rule: str, severity: str = "error") -> None:
         """添加业务规则断言"""
-        self._custom_assertions.append({
-            "name": name,
-            "rule": rule,
-            "severity": severity,
-        })
+        self._custom_assertions.append(
+            {
+                "name": name,
+                "rule": rule,
+                "severity": severity,
+            }
+        )
 
     async def evaluate_output(
         self,
@@ -116,11 +120,13 @@ class Evaluator:
         assertion_results = []
         for assertion in self._custom_assertions:
             passed = self._run_assertion(assertion, output_text, input_text)
-            assertion_results.append({
-                "name": assertion["name"],
-                "passed": passed,
-                "severity": assertion["severity"],
-            })
+            assertion_results.append(
+                {
+                    "name": assertion["name"],
+                    "passed": passed,
+                    "severity": assertion["severity"],
+                }
+            )
 
         # 与预期输出对比（如果有）
         accuracy = 1.0
@@ -164,6 +170,7 @@ class Evaluator:
             if target_fn:
                 try:
                     import asyncio
+
                     if asyncio.iscoroutinefunction(target_fn):
                         output = await target_fn(tc)
                     else:
@@ -194,17 +201,23 @@ class Evaluator:
             if eval_result["passed"]:
                 passed += 1
             else:
-                result.failed_cases.append({
-                    "case_id": tc.get("id", ""),
-                    "category": tc.get("category", ""),
-                    "issues": eval_result["issues"],
-                    "output": output[:200],
-                })
+                result.failed_cases.append(
+                    {
+                        "case_id": tc.get("id", ""),
+                        "category": tc.get("category", ""),
+                        "issues": eval_result["issues"],
+                        "output": output[:200],
+                    }
+                )
 
         result.passed_cases = passed
         result.accuracy = passed / len(test_cases) if test_cases else 0
-        result.format_compliance = sum(d["scores"]["format_compliance"] for d in details) / len(details) if details else 0
-        result.safety_compliance = sum(d["scores"]["safety_compliance"] for d in details) / len(details) if details else 0
+        result.format_compliance = (
+            sum(d["scores"]["format_compliance"] for d in details) / len(details) if details else 0
+        )
+        result.safety_compliance = (
+            sum(d["scores"]["safety_compliance"] for d in details) / len(details) if details else 0
+        )
         result.hallucination_rate = sum(d["scores"]["hallucination"] for d in details) / len(details) if details else 0
         result.recall_rate = result.accuracy * 0.95  # 模拟
         result.details = details
@@ -229,14 +242,13 @@ class Evaluator:
         DeepEval提供50+评测指标，支持LLM-as-judge和基于规则的评测
         """
         try:
-            from deepeval.test_case import LLMTestCase
             from deepeval.metrics import (
-                HallucinationMetric,
                 AnswerRelevancyMetric,
                 FaithfulnessMetric,
+                HallucinationMetric,
                 ToxicityMetric,
-                BiasMetric,
             )
+            from deepeval.test_case import LLMTestCase
 
             # 构造测试用例
             test_case = LLMTestCase(
@@ -256,9 +268,15 @@ class Evaluator:
                     hallucination_metric.measure(test_case)
                     scores["hallucination"] = hallucination_metric.score
                     if not hallucination_metric.is_successful():
-                        issues.append({"name": "hallucination", "passed": False, "severity": "warning",
-                                       "reason": hallucination_metric.reason})
-                except Exception as e:
+                        issues.append(
+                            {
+                                "name": "hallucination",
+                                "passed": False,
+                                "severity": "warning",
+                                "reason": hallucination_metric.reason,
+                            }
+                        )
+                except Exception:
                     scores["hallucination"] = self._check_hallucination(output_text, context)
 
             # 答案相关性
@@ -333,8 +351,14 @@ class Evaluator:
     def _check_safety(self, output: str) -> float:
         """安全合规检查"""
         dangerous_patterns = [
-            "password", "密码", "api_key", "apikey", "secret",
-            "身份证号", "银行卡号", "token",
+            "password",
+            "密码",
+            "api_key",
+            "apikey",
+            "secret",
+            "身份证号",
+            "银行卡号",
+            "token",
         ]
         output_lower = output.lower()
         for pattern in dangerous_patterns:

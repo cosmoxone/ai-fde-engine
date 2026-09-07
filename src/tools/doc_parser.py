@@ -2,6 +2,7 @@
 文档解析工具 - 基于Marker v2 / Docling
 MVP阶段使用模拟解析，生产环境调用Marker v2 GPU加速
 """
+
 from __future__ import annotations
 
 import os
@@ -36,6 +37,7 @@ class DocParserTool:
         """
         options = options or {}
         import time
+
         start = time.time()
 
         if not os.path.exists(file_path):
@@ -68,7 +70,7 @@ class DocParserTool:
         results = []
         batch_size = self.settings.doc_parser_batch_size
         for i in range(0, len(file_paths), batch_size):
-            batch = file_paths[i:i + batch_size]
+            batch = file_paths[i : i + batch_size]
             for fp in batch:
                 result = await self.parse(fp, options)
                 results.append(result)
@@ -82,7 +84,6 @@ class DocParserTool:
         """
         try:
             from docling.document_converter import DocumentConverter
-            from docling.datamodel.base_models import InputFormat
 
             # 初始化转换器（首次调用会下载模型）
             converter = DocumentConverter()
@@ -107,11 +108,13 @@ class DocParserTool:
             # 提取表格
             tables = []
             for table in doc.tables:
-                tables.append({
-                    "caption": table.caption,
-                    "rows": len(table.data) if hasattr(table, "data") else 0,
-                    "content": table.export_to_text() if hasattr(table, "export_to_text") else str(table),
-                })
+                tables.append(
+                    {
+                        "caption": table.caption,
+                        "rows": len(table.data) if hasattr(table, "data") else 0,
+                        "content": table.export_to_text() if hasattr(table, "export_to_text") else str(table),
+                    }
+                )
 
             return {
                 "success": True,
@@ -141,16 +144,18 @@ class DocParserTool:
         适合大批量PDF文档解析
         """
         try:
-            from marker.converters.pdf import PdfConverter
             from marker.config.parser import ConfigParser
+            from marker.converters.pdf import PdfConverter
             from marker.output import text_from_rendered
 
             # 配置
-            config_parser = ConfigParser({
-                "output_format": "markdown",
-                "use_gpu": self.settings.doc_parser_marker_gpu,
-                "language": self.settings.doc_parser_language,
-            })
+            config_parser = ConfigParser(
+                {
+                    "output_format": "markdown",
+                    "use_gpu": self.settings.doc_parser_marker_gpu,
+                    "language": self.settings.doc_parser_language,
+                }
+            )
             config = config_parser.generate_config()
 
             # 执行转换
@@ -208,7 +213,9 @@ class DocParserTool:
             line = line.strip()
             if not line:
                 continue
-            if line.startswith(("#", "1.", "2.", "3.", "4.", "5.")) or (len(line) < 30 and line.endswith(("流程", "标准", "问题"))):
+            if line.startswith(("#", "1.", "2.", "3.", "4.", "5.")) or (
+                len(line) < 30 and line.endswith(("流程", "标准", "问题"))
+            ):
                 block_type = "heading"
             elif line.startswith(("Q:", "A:")):
                 block_type = "qa"

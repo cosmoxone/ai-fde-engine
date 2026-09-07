@@ -4,6 +4,7 @@ FDE培训成长Agent - F8模块
          实时操作反馈、知识库与案例库、能力评估与认证
 设计理念：AI主导的FDE快速成长体系，6周从零基础到合格FDE
 """
+
 from __future__ import annotations
 
 import time
@@ -11,12 +12,13 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from .base import BaseAgent, AgentResult, AgentCapability
+from .base import AgentCapability, AgentResult, BaseAgent
 
 
 @dataclass
 class CompetencyScore:
     """能力项评分"""
+
     competency_id: str
     name: str
     dimension: str  # knowledge/skill/experience
@@ -29,6 +31,7 @@ class CompetencyScore:
 @dataclass
 class LearningPath:
     """学习路径"""
+
     path_id: str
     learner_id: str
     target_level: str  # L1-L5
@@ -41,6 +44,7 @@ class LearningPath:
 @dataclass
 class TrainingCase:
     """培训案例"""
+
     case_id: str
     title: str
     category: str  # ai_tech/business_analysis/solution_design/engineering/customer_communication
@@ -97,10 +101,34 @@ class TrainingAgent(BaseAgent):
     # 等级定义
     LEVELS = {
         "L1": {"name": "见习FDE", "min_score": 0, "max_score": 20, "can_independent": False, "training_weeks": "0-2周"},
-        "L2": {"name": "初级FDE", "min_score": 20, "max_score": 40, "can_independent": "简单项目(需导师Review)", "training_weeks": "2-4周"},
-        "L3": {"name": "合格FDE", "min_score": 40, "max_score": 65, "can_independent": "标准项目", "training_weeks": "4-6周"},
-        "L4": {"name": "高级FDE", "min_score": 65, "max_score": 85, "can_independent": "复杂项目+带新人", "training_weeks": "3-6个月"},
-        "L5": {"name": "专家FDE", "min_score": 85, "max_score": 100, "can_independent": "战略级项目+体系建设", "training_weeks": "6个月以上"},
+        "L2": {
+            "name": "初级FDE",
+            "min_score": 20,
+            "max_score": 40,
+            "can_independent": "简单项目(需导师Review)",
+            "training_weeks": "2-4周",
+        },
+        "L3": {
+            "name": "合格FDE",
+            "min_score": 40,
+            "max_score": 65,
+            "can_independent": "标准项目",
+            "training_weeks": "4-6周",
+        },
+        "L4": {
+            "name": "高级FDE",
+            "min_score": 65,
+            "max_score": 85,
+            "can_independent": "复杂项目+带新人",
+            "training_weeks": "3-6个月",
+        },
+        "L5": {
+            "name": "专家FDE",
+            "min_score": 85,
+            "max_score": 100,
+            "can_independent": "战略级项目+体系建设",
+            "training_weeks": "6个月以上",
+        },
     }
 
     def __init__(self, project_id: str, learner_id: Optional[str] = None, **kwargs):
@@ -136,14 +164,16 @@ class TrainingAgent(BaseAgent):
         """初始化能力评分（默认L1水平）"""
         for dim, dim_data in self.COMPETENCY_MODEL.items():
             for comp in dim_data["competencies"]:
-                self.competency_scores.append(CompetencyScore(
-                    competency_id=comp["id"],
-                    name=comp["name"],
-                    dimension=dim,
-                    level=1,
-                    score=15.0,
-                    last_assessed=time.time(),
-                ))
+                self.competency_scores.append(
+                    CompetencyScore(
+                        competency_id=comp["id"],
+                        name=comp["name"],
+                        dimension=dim,
+                        level=1,
+                        score=15.0,
+                        last_assessed=time.time(),
+                    )
+                )
 
     def _default_capabilities(self) -> list[AgentCapability]:
         return [
@@ -327,7 +357,11 @@ class TrainingAgent(BaseAgent):
                 "theme": "方案设计实战",
                 "goal": "能独立完成三方案设计",
                 "topics": ["产品方案设计", "技术方案选型", "验证方案设计", "方案交叉校验方法"],
-                "practical_tasks": ["沙箱项目2：基于调研结果完成方案设计", "对比AI方案与人工方案差异", "完成方案成本估算"],
+                "practical_tasks": [
+                    "沙箱项目2：基于调研结果完成方案设计",
+                    "对比AI方案与人工方案差异",
+                    "完成方案成本估算",
+                ],
                 "assessment": "独立完成三方案设计并通过审核",
                 "hours": 25,
             },
@@ -336,7 +370,12 @@ class TrainingAgent(BaseAgent):
                 "theme": "开发交付实战",
                 "goal": "能独立完成代码生成和部署",
                 "topics": ["Prompt工程进阶", "Agent开发实战", "知识库构建", "质量门禁使用", "Badcase处理"],
-                "practical_tasks": ["沙箱项目3：完成代码生成", "构建知识库并测试问答", "处理5个模拟Badcase", "完成部署"],
+                "practical_tasks": [
+                    "沙箱项目3：完成代码生成",
+                    "构建知识库并测试问答",
+                    "处理5个模拟Badcase",
+                    "完成部署",
+                ],
                 "assessment": "独立完成开发交付并通过质量门禁",
                 "hours": 30,
             },
@@ -354,7 +393,11 @@ class TrainingAgent(BaseAgent):
                 "theme": "综合实战与认证",
                 "goal": "独立完成完整项目交付，通过L3认证",
                 "topics": ["综合项目交付", "质量保障", "文档撰写", "验收流程"],
-                "practical_tasks": ["综合沙箱项目：独立完成完整交付（调研→方案→开发→迭代→验收）", "撰写项目交付文档", "准备认证考核"],
+                "practical_tasks": [
+                    "综合沙箱项目：独立完成完整交付（调研→方案→开发→迭代→验收）",
+                    "撰写项目交付文档",
+                    "准备认证考核",
+                ],
                 "assessment": "L3认证考核（理论+实操+案例分析）",
                 "hours": 35,
             },
@@ -376,18 +419,22 @@ class TrainingAgent(BaseAgent):
         # Mock：AI教练回复
         reply = self._mock_coach_reply(message, context)
 
-        self.coach_conversations.append({
-            "conversation_id": conversation_id,
-            "role": "user",
-            "content": message,
-            "timestamp": time.time(),
-        })
-        self.coach_conversations.append({
-            "conversation_id": conversation_id,
-            "role": "coach",
-            "content": reply["answer"],
-            "timestamp": time.time(),
-        })
+        self.coach_conversations.append(
+            {
+                "conversation_id": conversation_id,
+                "role": "user",
+                "content": message,
+                "timestamp": time.time(),
+            }
+        )
+        self.coach_conversations.append(
+            {
+                "conversation_id": conversation_id,
+                "role": "coach",
+                "content": reply["answer"],
+                "timestamp": time.time(),
+            }
+        )
 
         return AgentResult(
             success=True,
@@ -411,7 +458,7 @@ class TrainingAgent(BaseAgent):
             }
         elif any(k in msg_lower for k in ["报错", "错误", "error", "bug", "失败"]):
             return {
-                "answer": f"遇到问题了，让我们一起排查：\n\n1. 完整的错误信息是什么？\n2. 你在执行什么操作时遇到的？\n3. 最近做了什么改动？\n\n根据你描述的情况，可能的原因是XX。建议先检查XX配置。",
+                "answer": "遇到问题了，让我们一起排查：\n\n1. 完整的错误信息是什么？\n2. 你在执行什么操作时遇到的？\n3. 最近做了什么改动？\n\n根据你描述的情况，可能的原因是XX。建议先检查XX配置。",
                 "resources": [{"title": "常见问题排查指南", "type": "guide", "url": "#"}],
                 "next_steps": ["提供完整错误日志", "描述复现步骤", "我会帮你定位根因"],
             }
@@ -524,10 +571,26 @@ class TrainingAgent(BaseAgent):
     def _mock_action_feedback(self, action: str, context: dict) -> dict:
         """Mock：操作即时反馈"""
         feedback_map = {
-            "create_project": {"severity": "info", "message": "项目创建成功！建议下一步：上传业务资料，启动调研分析", "best_practice": "项目名称应包含客户和场景，便于后续管理"},
-            "upload_document": {"severity": "info", "message": "文档上传成功！AI正在解析，预计30秒内完成", "best_practice": "建议上传PDF/Word格式，扫描件建议先OCR处理"},
-            "run_research": {"severity": "info", "message": "调研分析已启动！完成后会自动通知你审核", "best_practice": "调研前确保已上传足够的业务资料（至少3份）"},
-            "generate_code": {"severity": "warning", "message": "代码生成中，注意：AI生成的代码必须经过人工Review才能上线", "best_practice": "代码生成后先运行测试，再进行人工Code Review"},
+            "create_project": {
+                "severity": "info",
+                "message": "项目创建成功！建议下一步：上传业务资料，启动调研分析",
+                "best_practice": "项目名称应包含客户和场景，便于后续管理",
+            },
+            "upload_document": {
+                "severity": "info",
+                "message": "文档上传成功！AI正在解析，预计30秒内完成",
+                "best_practice": "建议上传PDF/Word格式，扫描件建议先OCR处理",
+            },
+            "run_research": {
+                "severity": "info",
+                "message": "调研分析已启动！完成后会自动通知你审核",
+                "best_practice": "调研前确保已上传足够的业务资料（至少3份）",
+            },
+            "generate_code": {
+                "severity": "warning",
+                "message": "代码生成中，注意：AI生成的代码必须经过人工Review才能上线",
+                "best_practice": "代码生成后先运行测试，再进行人工Code Review",
+            },
             "default": {"severity": "info", "message": "操作已完成", "best_practice": ""},
         }
         return feedback_map.get(action, feedback_map["default"])
@@ -548,20 +611,84 @@ class TrainingAgent(BaseAgent):
     def _mock_search_knowledge(self, query: str, category: str) -> list[dict]:
         """Mock：搜索知识库"""
         knowledge_base = [
-            {"id": "kb1", "title": "RAG知识库构建最佳实践", "category": "ai_tech", "difficulty": "intermediate", "summary": "从文档分块到Embedding选择，完整的RAG构建指南", "tags": ["RAG", "知识库", "Embedding"]},
-            {"id": "kb2", "title": "Prompt工程进阶技巧", "category": "ai_tech", "difficulty": "advanced", "summary": "结构化Prompt、Few-shot、CoT等高级技巧", "tags": ["Prompt", "大模型", "技巧"]},
-            {"id": "kb3", "title": "业务流程建模方法论", "category": "business_analysis", "difficulty": "beginner", "summary": "从访谈笔记到BPMN流程图的完整方法", "tags": ["流程建模", "需求分析", "BPMN"]},
-            {"id": "kb4", "title": "AI项目方案设计模板", "category": "solution_design", "difficulty": "intermediate", "summary": "产品方案+技术方案+验证方案的标准模板和示例", "tags": ["方案设计", "模板", "最佳实践"]},
-            {"id": "kb5", "title": "智能客服项目成功案例", "category": "case_study", "difficulty": "intermediate", "summary": "某电商平台智能客服项目从0到1的完整复盘", "tags": ["案例", "智能客服", "电商"]},
-            {"id": "kb6", "title": "Badcase分析与修复指南", "category": "engineering", "difficulty": "intermediate", "summary": "常见Badcase类型、根因分析方法、修复策略", "tags": ["Badcase", "调试", "质量"]},
-            {"id": "kb7", "title": "客户沟通：如何管理期望", "category": "customer_communication", "difficulty": "intermediate", "summary": "需求确认、方案汇报、异议处理的沟通技巧", "tags": ["沟通", "期望管理", "客户关系"]},
-            {"id": "kb8", "title": "AI项目失败复盘Top10", "category": "case_study", "difficulty": "beginner", "summary": "从10个失败项目中总结的避坑指南", "tags": ["复盘", "失败案例", "避坑"]},
+            {
+                "id": "kb1",
+                "title": "RAG知识库构建最佳实践",
+                "category": "ai_tech",
+                "difficulty": "intermediate",
+                "summary": "从文档分块到Embedding选择，完整的RAG构建指南",
+                "tags": ["RAG", "知识库", "Embedding"],
+            },
+            {
+                "id": "kb2",
+                "title": "Prompt工程进阶技巧",
+                "category": "ai_tech",
+                "difficulty": "advanced",
+                "summary": "结构化Prompt、Few-shot、CoT等高级技巧",
+                "tags": ["Prompt", "大模型", "技巧"],
+            },
+            {
+                "id": "kb3",
+                "title": "业务流程建模方法论",
+                "category": "business_analysis",
+                "difficulty": "beginner",
+                "summary": "从访谈笔记到BPMN流程图的完整方法",
+                "tags": ["流程建模", "需求分析", "BPMN"],
+            },
+            {
+                "id": "kb4",
+                "title": "AI项目方案设计模板",
+                "category": "solution_design",
+                "difficulty": "intermediate",
+                "summary": "产品方案+技术方案+验证方案的标准模板和示例",
+                "tags": ["方案设计", "模板", "最佳实践"],
+            },
+            {
+                "id": "kb5",
+                "title": "智能客服项目成功案例",
+                "category": "case_study",
+                "difficulty": "intermediate",
+                "summary": "某电商平台智能客服项目从0到1的完整复盘",
+                "tags": ["案例", "智能客服", "电商"],
+            },
+            {
+                "id": "kb6",
+                "title": "Badcase分析与修复指南",
+                "category": "engineering",
+                "difficulty": "intermediate",
+                "summary": "常见Badcase类型、根因分析方法、修复策略",
+                "tags": ["Badcase", "调试", "质量"],
+            },
+            {
+                "id": "kb7",
+                "title": "客户沟通：如何管理期望",
+                "category": "customer_communication",
+                "difficulty": "intermediate",
+                "summary": "需求确认、方案汇报、异议处理的沟通技巧",
+                "tags": ["沟通", "期望管理", "客户关系"],
+            },
+            {
+                "id": "kb8",
+                "title": "AI项目失败复盘Top10",
+                "category": "case_study",
+                "difficulty": "beginner",
+                "summary": "从10个失败项目中总结的避坑指南",
+                "tags": ["复盘", "失败案例", "避坑"],
+            },
         ]
         # 简单过滤
         query_lower = query.lower()
-        filtered = [k for k in knowledge_base if
-                    (category == "all" or k["category"] == category) and
-                    (not query or query_lower in k["title"].lower() or query_lower in k["summary"].lower() or any(query_lower in t.lower() for t in k["tags"]))]
+        filtered = [
+            k
+            for k in knowledge_base
+            if (category == "all" or k["category"] == category)
+            and (
+                not query
+                or query_lower in k["title"].lower()
+                or query_lower in k["summary"].lower()
+                or any(query_lower in t.lower() for t in k["tags"])
+            )
+        ]
         return filtered or knowledge_base[:3]
 
     async def _take_exam(self, input_data: dict[str, Any]) -> AgentResult:
@@ -609,7 +736,9 @@ class TrainingAgent(BaseAgent):
             "passed": passed,
             "sections": sections,
             "weak_areas": [s["name"] for s in sections if s["score"] < 80],
-            "next_steps": ["针对薄弱环节加强学习", "1周后可重新考核"] if not passed else ["恭喜通过认证！", "可以开始独立承担项目"],
+            "next_steps": ["针对薄弱环节加强学习", "1周后可重新考核"]
+            if not passed
+            else ["恭喜通过认证！", "可以开始独立承担项目"],
         }
 
     def _get_certification(self, input_data: dict[str, Any]) -> AgentResult:

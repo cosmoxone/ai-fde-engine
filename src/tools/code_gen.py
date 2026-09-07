@@ -2,11 +2,12 @@
 代码生成工具 - 基于OpenHands / Aider / OpenCode
 MVP阶段使用模拟，生产环境调用OpenHands SDK
 """
+
 from __future__ import annotations
 
 import json
 import os
-from typing import Any, Optional
+from typing import Optional
 
 from ..config import get_settings
 
@@ -111,8 +112,11 @@ class CodeGenTool:
         }
 
     async def _generate_with_aider(
-        self, project_path: str, project_name: str,
-        requirements: list[dict], tech_stack: dict,
+        self,
+        project_path: str,
+        project_name: str,
+        requirements: list[dict],
+        tech_stack: dict,
     ) -> Optional[dict]:
         """
         使用Aider生成代码（真实实现）
@@ -120,8 +124,8 @@ class CodeGenTool:
         Aider是终端原生的AI编程助手，支持git集成、多文件编辑、自动测试
         """
         try:
-            import subprocess
             import shutil
+            import subprocess
 
             if not shutil.which("aider"):
                 print("[CodeGen] Aider未安装，降级到mock。安装: pip install aider-chat")
@@ -134,7 +138,9 @@ class CodeGenTool:
             req_content += "## 功能需求\n"
             for req in requirements:
                 req_content += f"- [{req.get('priority', 'P1')}] {req.get('title', '')}: {req.get('description', '')}\n"
-            req_content += "\n## 任务\n请基于以上需求生成完整的项目代码，包括项目结构、核心模块、配置文件、测试代码和README。\n"
+            req_content += (
+                "\n## 任务\n请基于以上需求生成完整的项目代码，包括项目结构、核心模块、配置文件、测试代码和README。\n"
+            )
             with open(req_file, "w") as f:
                 f.write(req_content)
 
@@ -147,10 +153,12 @@ class CodeGenTool:
             prompt = f"请阅读REQUIREMENTS.md，生成完整的项目代码。使用{tech_stack.get('backend', 'FastAPI')}后端框架。"
             cmd = [
                 "aider",
-                "--model", self.settings.get_model_for_task("code")[0],
+                "--model",
+                self.settings.get_model_for_task("code")[0],
                 "--no-auto-commits",
                 "--yes-always",
-                "--message", prompt,
+                "--message",
+                prompt,
                 "REQUIREMENTS.md",
             ]
 
@@ -159,8 +167,9 @@ class CodeGenTool:
                 env["OPENAI_API_KEY"] = self.settings.deepseek_api_key
                 env["OPENAI_API_BASE"] = self.settings.deepseek_base_url
 
-            result = subprocess.run(cmd, cwd=project_path, capture_output=True, text=True,
-                                    timeout=self.settings.code_gen_timeout, env=env)
+            result = subprocess.run(
+                cmd, cwd=project_path, capture_output=True, text=True, timeout=self.settings.code_gen_timeout, env=env
+            )
 
             # 收集生成的文件
             files = []
@@ -184,8 +193,11 @@ class CodeGenTool:
             return None
 
     async def _generate_with_openhands(
-        self, project_path: str, project_name: str,
-        requirements: list[dict], tech_stack: dict,
+        self,
+        project_path: str,
+        project_name: str,
+        requirements: list[dict],
+        tech_stack: dict,
     ) -> Optional[dict]:
         """
         使用OpenHands生成代码（真实实现）
@@ -202,8 +214,11 @@ class CodeGenTool:
             return None
 
     async def _generate_with_opencode(
-        self, project_path: str, project_name: str,
-        requirements: list[dict], tech_stack: dict,
+        self,
+        project_path: str,
+        project_name: str,
+        requirements: list[dict],
+        tech_stack: dict,
     ) -> Optional[dict]:
         """
         使用OpenCode生成代码（真实实现）
@@ -211,8 +226,8 @@ class CodeGenTool:
         OpenCode是终端原生的AI编程Agent，支持多模型、MCP协议
         """
         try:
-            import subprocess
             import shutil
+            import subprocess
 
             if not shutil.which("opencode"):
                 print("[CodeGen] OpenCode未安装，降级到mock。安装: npm install -g opencode-ai")
@@ -222,8 +237,7 @@ class CodeGenTool:
             prompt = f"基于需求生成{project_name}项目代码。技术栈: {json.dumps(tech_stack)}"
             cmd = ["opencode", "run", prompt, "--dir", project_path]
 
-            result = subprocess.run(cmd, capture_output=True, text=True,
-                                    timeout=self.settings.code_gen_timeout)
+            subprocess.run(cmd, capture_output=True, text=True, timeout=self.settings.code_gen_timeout)
 
             files = []
             for root, _, filenames in os.walk(project_path):
@@ -243,17 +257,21 @@ class CodeGenTool:
             print(f"[CodeGen] OpenCode生成失败: {e}")
             return None
 
-    def _scaffold_project(
-        self, path: str, name: str, requirements: list[dict], tech_stack: dict
-    ) -> list[str]:
+    def _scaffold_project(self, path: str, name: str, requirements: list[dict], tech_stack: dict) -> list[str]:
         """生成项目骨架文件"""
         files = []
 
         # 目录结构
         dirs = [
-            "app", "app/api", "app/api/v1", "app/core",
-            "app/models", "app/schemas", "app/services",
-            "tests", "deploy",
+            "app",
+            "app/api",
+            "app/api/v1",
+            "app/core",
+            "app/models",
+            "app/schemas",
+            "app/services",
+            "tests",
+            "deploy",
         ]
         for d in dirs:
             os.makedirs(os.path.join(path, d), exist_ok=True)
@@ -308,20 +326,22 @@ settings = Settings()
         # API路由
         router_path = os.path.join(path, "app", "api", "v1", "__init__.py")
         with open(router_path, "w") as f:
-            f.write('''from fastapi import APIRouter
+            f.write("""from fastapi import APIRouter
 
 api_router = APIRouter()
 
 @api_router.get("/")
 async def root():
     return {"message": "API v1"}
-''')
+""")
         files.append("app/api/v1/__init__.py")
 
         # requirements.txt
         req_path = os.path.join(path, "requirements.txt")
         with open(req_path, "w") as f:
-            f.write("fastapi>=0.110\nuvicorn>=0.27\nsqlalchemy>=2.0\npydantic>=2.0\npydantic-settings>=2.0\npytest>=8.0\nhttpx>=0.27\n")
+            f.write(
+                "fastapi>=0.110\nuvicorn>=0.27\nsqlalchemy>=2.0\npydantic>=2.0\npydantic-settings>=2.0\npytest>=8.0\nhttpx>=0.27\n"
+            )
         files.append("requirements.txt")
 
         # 测试文件
@@ -346,7 +366,7 @@ def test_health_check():
         # README
         readme_path = os.path.join(path, "README.md")
         with open(readme_path, "w") as f:
-            f.write(f'''# {name}
+            f.write(f"""# {name}
 
 AI-FDE项目自动生成的后端服务。
 
@@ -366,7 +386,7 @@ pytest tests/ -v
 ## API文档
 
 启动后访问 http://localhost:8000/docs
-''')
+""")
         files.append("README.md")
 
         return files

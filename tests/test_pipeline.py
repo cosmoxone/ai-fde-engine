@@ -1,10 +1,12 @@
 """
 流水线模块测试
 """
+
 import os
+
 import pytest
 
-from src.pipeline.iteration import NightlyIterationPipeline, IterationResult
+from src.pipeline.iteration import IterationResult, NightlyIterationPipeline
 
 
 @pytest.fixture
@@ -70,9 +72,11 @@ class TestNightlyIterationPipeline:
 
     @pytest.mark.asyncio
     async def test_report_contains_sections(self, pipeline):
-        result = await pipeline.run([
-            {"id": "B1", "input": "test", "actual_output": "不知道", "severity": "major"},
-        ])
+        result = await pipeline.run(
+            [
+                {"id": "B1", "input": "test", "actual_output": "不知道", "severity": "major"},
+            ]
+        )
         report = result.report
         assert "迭代概览" in report
         assert "执行步骤" in report
@@ -89,9 +93,11 @@ class TestNightlyIterationPipeline:
 
     @pytest.mark.asyncio
     async def test_pending_issues_for_human(self, pipeline):
-        result = await pipeline.run([
-            {"id": "B1", "input": "test", "actual_output": "规则冲突，特殊情况", "severity": "major"},
-        ])
+        result = await pipeline.run(
+            [
+                {"id": "B1", "input": "test", "actual_output": "规则冲突，特殊情况", "severity": "major"},
+            ]
+        )
         # 规则冲突类问题应被标记为需人工处理
         assert result.need_human >= 1
         assert len(result.pending_issues) >= 1

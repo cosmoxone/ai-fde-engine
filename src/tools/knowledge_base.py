@@ -2,9 +2,10 @@
 知识库工具 - 基于LightRAG知识图谱RAG
 MVP阶段使用模拟，生产环境调用LightRAG + Qdrant
 """
+
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 from ..config import get_settings
 
@@ -45,6 +46,7 @@ class KnowledgeBaseTool:
         if self._qdrant_client is None:
             try:
                 from qdrant_client import QdrantClient
+
                 self._qdrant_client = QdrantClient(
                     host=self.settings.qdrant_host,
                     port=self.settings.qdrant_port,
@@ -63,6 +65,7 @@ class KnowledgeBaseTool:
         if self._embedding_model is None:
             try:
                 from sentence_transformers import SentenceTransformer
+
                 self._embedding_model = SentenceTransformer(self.settings.kb_embedding_model)
             except ImportError:
                 print("[KB] sentence-transformers未安装，使用模拟向量。安装: pip install sentence-transformers")
@@ -80,6 +83,7 @@ class KnowledgeBaseTool:
         # mock：返回固定维度的随机向量（基于文本hash保证一致性）
         import hashlib
         import random
+
         h = int(hashlib.md5(text.encode()).hexdigest(), 16)
         rng = random.Random(h)
         dim = self.settings.kb_embedding_dim
@@ -93,7 +97,7 @@ class KnowledgeBaseTool:
         words = text.split()
         i = 0
         while i < len(words):
-            chunk = " ".join(words[i:i + chunk_size])
+            chunk = " ".join(words[i : i + chunk_size])
             chunks.append(chunk)
             i += chunk_size - overlap
         return chunks if chunks else [text]
@@ -132,13 +136,16 @@ class KnowledgeBaseTool:
                 if qdrant:
                     try:
                         from qdrant_client.models import PointStruct
+
                         qdrant.upsert(
                             collection_name=kb_id,
-                            points=[PointStruct(
-                                id=hash(f"{kb_id}_{filename}_{i}") % (2**32),
-                                vector=vector,
-                                payload={"text": chunk, "filename": filename, "chunk_index": i},
-                            )],
+                            points=[
+                                PointStruct(
+                                    id=hash(f"{kb_id}_{filename}_{i}") % (2**32),
+                                    vector=vector,
+                                    payload={"text": chunk, "filename": filename, "chunk_index": i},
+                                )
+                            ],
                         )
                     except Exception as e:
                         print(f"[KB] Qdrant存储失败: {e}")
@@ -151,7 +158,8 @@ class KnowledgeBaseTool:
         # 确保Qdrant集合存在
         if qdrant:
             try:
-                from qdrant_client.models import VectorParams, Distance
+                from qdrant_client.models import Distance, VectorParams
+
                 collections = [c.name for c in qdrant.get_collections().collections]
                 if kb_id not in collections:
                     qdrant.create_collection(
@@ -185,8 +193,6 @@ class KnowledgeBaseTool:
         """
         if kb_id not in self._kbs:
             return {"success": False, "error": f"知识库不存在: {kb_id}"}
-
-        kb = self._kbs[kb_id]
 
         # 真实模式：使用Qdrant向量检索
         qdrant = self._get_qdrant_client() if self.settings.kb_provider in ("lightrag", "qdrant", "basic") else None

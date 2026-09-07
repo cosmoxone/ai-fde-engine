@@ -1,9 +1,10 @@
 """
 评测模块测试
 """
+
 import pytest
 
-from src.evaluation.evaluator import Evaluator, QualityGate, EvaluationResult
+from src.evaluation.evaluator import EvaluationResult, Evaluator, QualityGate
 
 
 @pytest.fixture
@@ -125,7 +126,9 @@ class TestEvaluator:
 
     @pytest.mark.asyncio
     async def test_check_quality_gate(self, evaluator):
-        result = EvaluationResult(accuracy=0.95, hallucination_rate=0.05, recall_rate=0.9, format_compliance=0.98, safety_compliance=1.0)
+        result = EvaluationResult(
+            accuracy=0.95, hallucination_rate=0.05, recall_rate=0.9, format_compliance=0.98, safety_compliance=1.0
+        )
         passed, items = evaluator.check_quality_gate(result)
         assert passed is True
 

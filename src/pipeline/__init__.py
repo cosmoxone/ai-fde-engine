@@ -1,4 +1,5 @@
 """流水线模块"""
-from .iteration import NightlyIterationPipeline, IterationResult
+
+from .iteration import IterationResult, NightlyIterationPipeline
 
 __all__ = ["NightlyIterationPipeline", "IterationResult"]

@@ -1,21 +1,24 @@
 """
 工具模块测试
 """
+
 import os
+
 import pytest
 
-from src.tools.doc_parser import DocParserTool
-from src.tools.knowledge_base import KnowledgeBaseTool
 from src.tools.benchmark import BenchmarkTool
 from src.tools.code_gen import CodeGenTool
 from src.tools.data_explorer import DataExplorerTool
+from src.tools.doc_parser import DocParserTool
+from src.tools.knowledge_base import KnowledgeBaseTool
 
 
 @pytest.fixture
 def sample_txt_file(tmp_path):
     """创建测试文本文件"""
     file_path = tmp_path / "test_doc.txt"
-    file_path.write_text("""业务操作手册
+    file_path.write_text(
+        """业务操作手册
 
 1. 业务受理流程
 客户提交申请后，系统自动登记基本信息，转审核环节。
@@ -29,7 +32,9 @@ Q: 资料缺失怎么办？
 A: 系统自动通知客户补充。
 Q: 审核不通过如何申诉？
 A: 提交申诉材料，3个工作日内回复。
-""", encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
     return str(file_path)
 
 
@@ -91,10 +96,13 @@ class TestKnowledgeBaseTool:
     @pytest.mark.asyncio
     async def test_add_documents(self, kb_tool):
         await kb_tool.create("test_kb")
-        result = await kb_tool.add_documents("kb_test_project_test_kb", [
-            {"content": "业务流程包括受理、审核、处理", "filename": "doc1.pdf"},
-            {"content": "审核标准包括完整性和合规性", "filename": "doc2.pdf"},
-        ])
+        result = await kb_tool.add_documents(
+            "kb_test_project_test_kb",
+            [
+                {"content": "业务流程包括受理、审核、处理", "filename": "doc1.pdf"},
+                {"content": "审核标准包括完整性和合规性", "filename": "doc2.pdf"},
+            ],
+        )
         assert result["success"] is True
         assert result["documents_added"] == 2
         assert result["entities_added"] > 0

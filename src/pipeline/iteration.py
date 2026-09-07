@@ -3,20 +3,22 @@
 MVP阶段使用Python协程实现，生产环境切换为Argo Workflows
 流程：数据归集 → 自动归因 → 自动修复 → 回归测试 → 门禁判断 → 自动部署 → 版本报告
 """
+
 from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Optional
+from typing import Optional
 
 from ..agents.delivery import DeliveryAgent
-from ..evaluation.evaluator import Evaluator
 from ..config import get_settings
+from ..evaluation.evaluator import Evaluator
 
 
 @dataclass
 class IterationResult:
     """迭代结果"""
+
     success: bool
     version: str
     iteration_number: int
@@ -79,15 +81,16 @@ class NightlyIterationPipeline:
         result.auto_fixed = fix_result.structured_output.get("fixed_count", 0)
         result.need_human = fix_result.structured_output.get("need_human_count", 0)
         result.pending_issues = [
-            r for r in fix_result.structured_output.get("results", [])
-            if r.get("fix") == "need_human_review"
+            r for r in fix_result.structured_output.get("results", []) if r.get("fix") == "need_human_review"
         ]
-        result.steps.append({
-            "step": "attribution_and_fix",
-            "success": True,
-            "auto_fixed": result.auto_fixed,
-            "need_human": result.need_human,
-        })
+        result.steps.append(
+            {
+                "step": "attribution_and_fix",
+                "success": True,
+                "auto_fixed": result.auto_fixed,
+                "need_human": result.need_human,
+            }
+        )
 
         # Step 3: 回归测试
         if benchmark_cases:
@@ -101,32 +104,38 @@ class NightlyIterationPipeline:
             failed_items = []
 
         result.gate_passed = gate_passed
-        result.steps.append({
-            "step": "regression_test",
-            "success": True,
-            "accuracy": result.regression_accuracy,
-            "gate_passed": gate_passed,
-            "failed_items": failed_items,
-        })
+        result.steps.append(
+            {
+                "step": "regression_test",
+                "success": True,
+                "accuracy": result.regression_accuracy,
+                "gate_passed": gate_passed,
+                "failed_items": failed_items,
+            }
+        )
 
         # Step 4: 门禁判断 + 部署/回滚
         if gate_passed and self.settings.iteration_auto_deploy:
             deploy_result = await self.delivery_agent._auto_deploy({"version": version})
             result.deployed = deploy_result.success
-            result.steps.append({
-                "step": "deploy",
-                "success": deploy_result.success,
-                "version": version,
-                "endpoint": deploy_result.structured_output.get("endpoint", ""),
-            })
+            result.steps.append(
+                {
+                    "step": "deploy",
+                    "success": deploy_result.success,
+                    "version": version,
+                    "endpoint": deploy_result.structured_output.get("endpoint", ""),
+                }
+            )
         elif not gate_passed:
             result.rolled_back = True
-            result.steps.append({
-                "step": "rollback",
-                "success": True,
-                "reason": "质量门禁未通过，自动回滚",
-                "failed_items": failed_items,
-            })
+            result.steps.append(
+                {
+                    "step": "rollback",
+                    "success": True,
+                    "reason": "质量门禁未通过，自动回滚",
+                    "failed_items": failed_items,
+                }
+            )
 
         # Step 5: 生成报告
         result.duration_seconds = round(time.time() - start_time, 2)
@@ -159,7 +168,7 @@ class NightlyIterationPipeline:
 - 自动修复: {result.auto_fixed}个
 - 需人工确认: {result.need_human}个
 - 回归准确率: {result.regression_accuracy:.2%}
-- 质量门禁: {'通过 ✓' if result.gate_passed else '未通过 ✗'}
+- 质量门禁: {"通过 ✓" if result.gate_passed else "未通过 ✗"}
 - 部署状态: {status}
 - 耗时: {result.duration_seconds}秒
 
@@ -181,7 +190,7 @@ class NightlyIterationPipeline:
             for issue in result.pending_issues[:5]:
                 report += f"- [{issue.get('badcase_id', '')}] 需人工确认\n"
 
-        report += f"\n## 下一步\n"
+        report += "\n## 下一步\n"
         if result.need_human > 0:
             report += f"- 人工审核{result.need_human}个待确认问题\n"
         report += "- 收集新的用户反馈，准备下一轮迭代\n"

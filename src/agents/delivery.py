@@ -2,13 +2,13 @@
 开发交付Agent - 负责代码生成、知识库构建、Badcase修复、自动部署、日迭代
 模型：DeepSeek V4 Pro（代码SOTA）
 """
+
 from __future__ import annotations
 
 import os
-import tempfile
 from typing import Any
 
-from .base import BaseAgent, AgentResult
+from .base import AgentResult, BaseAgent
 
 
 class DeliveryAgent(BaseAgent):
@@ -118,7 +118,9 @@ async def health():
         req_txt = os.path.join(path, "backend", "requirements.txt")
         os.makedirs(os.path.dirname(req_txt), exist_ok=True)
         with open(req_txt, "w") as f:
-            f.write("fastapi>=0.110\nuvicorn>=0.27\nsqlalchemy>=2.0\npydantic>=2.0\npydantic-ai>=0.8\npython-multipart>=0.0.7\n")
+            f.write(
+                "fastapi>=0.110\nuvicorn>=0.27\nsqlalchemy>=2.0\npydantic>=2.0\npydantic-ai>=0.8\npython-multipart>=0.0.7\n"
+            )
         files.append("backend/requirements.txt")
 
         # API路由
@@ -126,13 +128,17 @@ async def health():
         os.makedirs(api_path, exist_ok=True)
         init_py = os.path.join(api_path, "__init__.py")
         with open(init_py, "w") as f:
-            f.write('''from fastapi import APIRouter\nfrom app.api.v1.projects import router as projects_router\nfrom app.api.v1.kb import router as kb_router\n\napi_router = APIRouter()\napi_router.include_router(projects_router, prefix="/projects", tags=["projects"])\napi_router.include_router(kb_router, prefix="/kb", tags=["knowledge-base"])\n''')
+            f.write(
+                """from fastapi import APIRouter\nfrom app.api.v1.projects import router as projects_router\nfrom app.api.v1.kb import router as kb_router\n\napi_router = APIRouter()\napi_router.include_router(projects_router, prefix="/projects", tags=["projects"])\napi_router.include_router(kb_router, prefix="/kb", tags=["knowledge-base"])\n"""
+            )
         files.append("backend/app/api/v1/__init__.py")
 
         # Dockerfile
         dockerfile = os.path.join(path, "Dockerfile")
         with open(dockerfile, "w") as f:
-            f.write(f'''FROM python:3.11-slim\nWORKDIR /app\nCOPY backend/requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY backend/ .\nCMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]\n''')
+            f.write(
+                """FROM python:3.11-slim\nWORKDIR /app\nCOPY backend/requirements.txt .\nRUN pip install --no-cache-dir -r requirements.txt\nCOPY backend/ .\nCMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]\n"""
+            )
         files.append("Dockerfile")
 
         return files
@@ -194,20 +200,39 @@ async def health():
 
     def _attribute_badcase(self, badcase: dict) -> dict:
         """Badcase自动归因"""
-        error_type = badcase.get("error_type", "")
         input_text = badcase.get("input", "") + badcase.get("actual_output", "")
 
         # 基于规则的归因（实际部署中用LLM归因）
         if any(kw in input_text for kw in ["不知道", "未找到", "没有相关", "无法回答"]):
-            return {"type": "knowledge", "auto_fixable": True, "reason": "知识库缺失或召回失败", "fix_strategy": "补充文档/优化检索"}
+            return {
+                "type": "knowledge",
+                "auto_fixable": True,
+                "reason": "知识库缺失或召回失败",
+                "fix_strategy": "补充文档/优化检索",
+            }
         elif any(kw in input_text for kw in ["格式错误", "字段缺失", "不符合规范"]):
-            return {"type": "prompt", "auto_fixable": True, "reason": "Prompt未约束输出格式", "fix_strategy": "优化Prompt/增加格式断言"}
+            return {
+                "type": "prompt",
+                "auto_fixable": True,
+                "reason": "Prompt未约束输出格式",
+                "fix_strategy": "优化Prompt/增加格式断言",
+            }
         elif any(kw in input_text for kw in ["报错", "异常", "500", "崩溃"]):
             return {"type": "code", "auto_fixable": True, "reason": "代码Bug", "fix_strategy": "定位修复代码"}
         elif any(kw in input_text for kw in ["规则冲突", "业务矛盾", "特殊情况"]):
-            return {"type": "rule", "auto_fixable": False, "reason": "业务规则理解偏差，需人工确认", "fix_strategy": "人工确认业务规则"}
+            return {
+                "type": "rule",
+                "auto_fixable": False,
+                "reason": "业务规则理解偏差，需人工确认",
+                "fix_strategy": "人工确认业务规则",
+            }
         else:
-            return {"type": "model_boundary", "auto_fixable": False, "reason": "模型能力边界，无法自动修复", "fix_strategy": "标记为已知限制"}
+            return {
+                "type": "model_boundary",
+                "auto_fixable": False,
+                "reason": "模型能力边界，无法自动修复",
+                "fix_strategy": "标记为已知限制",
+            }
 
     async def _apply_fix(self, badcase: dict, attribution: dict) -> dict:
         """应用自动修复"""
@@ -264,7 +289,9 @@ async def health():
         if regression["gate_passed"]:
             deploy_result = await self._auto_deploy({"version": version})
         else:
-            deploy_result = AgentResult(success=False, content="质量门禁未通过，已回滚", structured_output={"status": "rolled_back"})
+            deploy_result = AgentResult(
+                success=False, content="质量门禁未通过，已回滚", structured_output={"status": "rolled_back"}
+            )
 
         # Step4: 生成报告
         report = {
@@ -274,7 +301,9 @@ async def health():
             "need_human": fix_result.structured_output.get("need_human_count", 0),
             "regression": regression,
             "deployment": deploy_result.structured_output,
-            "pending_issues": [r for r in fix_result.structured_output.get("results", []) if r.get("fix") == "need_human_review"],
+            "pending_issues": [
+                r for r in fix_result.structured_output.get("results", []) if r.get("fix") == "need_human_review"
+            ],
             "summary": f"夜间迭代完成：修复{fix_result.structured_output.get('fixed_count', 0)}个问题，回归测试准确率{regression['accuracy']}，版本{version}已{'部署' if regression['gate_passed'] else '回滚'}。",
         }
 

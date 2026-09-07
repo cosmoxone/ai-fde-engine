@@ -1,9 +1,9 @@
 """
 Pytest配置与共享fixture
 """
+
 import os
 import sys
-import tempfile
 
 import pytest
 
@@ -21,4 +21,5 @@ def isolated_memory_dir(tmp_path):
     yield
     # 清理MemoryManager单例
     from src.memory.manager import MemoryManager
+
     MemoryManager._instances.clear()

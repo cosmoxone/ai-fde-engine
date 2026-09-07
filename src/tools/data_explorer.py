@@ -2,6 +2,7 @@
 数据探查工具 - 基于DB-GPT Agent
 MVP阶段使用模拟，生产环境调用DB-GPT
 """
+
 from __future__ import annotations
 
 from typing import Any, Optional
@@ -101,7 +102,12 @@ class DataExplorerTool:
             },
             "issues": [
                 {"table": "customers", "column": "phone", "issue": "15%记录手机号缺失", "severity": "medium"},
-                {"table": "business_orders", "column": "processed_at", "issue": "已完成工单中5%处理时间为空", "severity": "high"},
+                {
+                    "table": "business_orders",
+                    "column": "processed_at",
+                    "issue": "已完成工单中5%处理时间为空",
+                    "severity": "high",
+                },
                 {"table": "audit_logs", "issue": "存在重复记录约2%", "severity": "low"},
             ],
             "recommendations": [

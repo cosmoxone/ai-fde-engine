@@ -3,11 +3,12 @@ F7 P1增强功能 + F8培训模块 集成测试
 覆盖：F7.10培训推送/F7.11客户成长路径/F7.12付费转化/F7.13沟通通道
       F8能力模型/学习路径/AI教练/实战沙箱/知识库/考核认证
 """
+
 import pytest
 from fastapi.testclient import TestClient
 
-from src.main import app
 from src.agents.training import TrainingAgent
+from src.main import app
 
 
 @pytest.fixture
@@ -30,6 +31,7 @@ def training_agent():
 # ============================================================
 # F7 P1 功能测试
 # ============================================================
+
 
 class TestF7P1TrainingPush:
     """F7.10 培训内容推送"""
@@ -67,9 +69,17 @@ class TestF7P1CustomerMaturity:
         assert "growth_path" in assessment
 
     def test_assess_maturity_with_behavior(self, client, project):
-        resp = client.post(f"/api/v1/projects/{project}/self-service/maturity/assess", json={
-            "behavior": {"ai_cognition_score": 70, "requirement_score": 60, "tech_score": 50, "self_service_score": 65}
-        })
+        resp = client.post(
+            f"/api/v1/projects/{project}/self-service/maturity/assess",
+            json={
+                "behavior": {
+                    "ai_cognition_score": 70,
+                    "requirement_score": 60,
+                    "tech_score": 50,
+                    "self_service_score": 65,
+                }
+            },
+        )
         assert resp.status_code == 200
         assessment = resp.json()["result"]["assessment"]
         assert assessment["avg_score"] > 50
@@ -117,11 +127,14 @@ class TestF7P1Communication:
     """F7.13 客户沟通通道"""
 
     def test_log_communication_api(self, client, project):
-        resp = client.post(f"/api/v1/projects/{project}/self-service/communications", json={
-            "type": "meeting",
-            "content": "客户对原型表示满意，希望增加导出功能",
-            "participants": ["客户A", "FDE工程师B"],
-        })
+        resp = client.post(
+            f"/api/v1/projects/{project}/self-service/communications",
+            json={
+                "type": "meeting",
+                "content": "客户对原型表示满意，希望增加导出功能",
+                "participants": ["客户A", "FDE工程师B"],
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["success"] is True
@@ -132,9 +145,9 @@ class TestF7P1Communication:
         assert len(result["summary"]["action_items"]) > 0
 
     def test_communication_action_items(self, client, project):
-        resp = client.post(f"/api/v1/projects/{project}/self-service/communications", json={
-            "type": "call", "content": "讨论部署方案"
-        })
+        resp = client.post(
+            f"/api/v1/projects/{project}/self-service/communications", json={"type": "call", "content": "讨论部署方案"}
+        )
         action_items = resp.json()["result"]["summary"]["action_items"]
         for item in action_items:
             assert "item" in item
@@ -145,6 +158,7 @@ class TestF7P1Communication:
 # ============================================================
 # F8 培训模块测试
 # ============================================================
+
 
 class TestF8CompetencyModel:
     """F8.1 FDE能力模型定义"""
@@ -184,9 +198,9 @@ class TestF8CompetencyAssessment:
     """F8.1+F8.7 能力评估"""
 
     def test_assess_api(self, client):
-        resp = client.post("/api/v1/training/assess", json={
-            "background": {"ai_experience_years": 1, "dev_experience_years": 3}
-        })
+        resp = client.post(
+            "/api/v1/training/assess", json={"background": {"ai_experience_years": 1, "dev_experience_years": 3}}
+        )
         assert resp.status_code == 200
         assessment = resp.json()["assessment"]
         assert "overall_level" in assessment
@@ -197,20 +211,30 @@ class TestF8CompetencyAssessment:
 
     def test_assess_with_experience(self, training_agent):
         import asyncio
-        result = asyncio.run(training_agent.run({
-            "task_type": "assess_competency",
-            "background": {"ai_experience_years": 2, "dev_experience_years": 5, "fde_experience": True},
-        }))
+
+        result = asyncio.run(
+            training_agent.run(
+                {
+                    "task_type": "assess_competency",
+                    "background": {"ai_experience_years": 2, "dev_experience_years": 5, "fde_experience": True},
+                }
+            )
+        )
         assert result.success
         assert result.structured_output["avg_score"] > 30
         assert result.structured_output["overall_level"] in ["L2", "L3", "L4"]
 
     def test_assess_beginner(self, training_agent):
         import asyncio
-        result = asyncio.run(training_agent.run({
-            "task_type": "assess_competency",
-            "background": {"ai_experience_years": 0, "dev_experience_years": 0},
-        }))
+
+        result = asyncio.run(
+            training_agent.run(
+                {
+                    "task_type": "assess_competency",
+                    "background": {"ai_experience_years": 0, "dev_experience_years": 0},
+                }
+            )
+        )
         assert result.success
         assert result.structured_output["overall_level"] == "L1"
 
@@ -219,9 +243,7 @@ class TestF8LearningPath:
     """F8.2 个性化学习路径生成"""
 
     def test_generate_path_api(self, client):
-        resp = client.post("/api/v1/training/learning-path", json={
-            "target_level": "L3", "current_level": "L1"
-        })
+        resp = client.post("/api/v1/training/learning-path", json={"target_level": "L3", "current_level": "L1"})
         assert resp.status_code == 200
         path = resp.json()["learning_path"]
         assert "path" in path
@@ -231,10 +253,15 @@ class TestF8LearningPath:
 
     def test_weekly_plan_structure(self, training_agent):
         import asyncio
-        result = asyncio.run(training_agent.run({
-            "task_type": "generate_learning_path",
-            "target_level": "L3",
-        }))
+
+        result = asyncio.run(
+            training_agent.run(
+                {
+                    "task_type": "generate_learning_path",
+                    "target_level": "L3",
+                }
+            )
+        )
         weeks = result.structured_output["weekly_plan"]
         assert weeks[0]["theme"] == "基础认知"
         assert weeks[1]["theme"] == "调研分析实战"
@@ -253,9 +280,7 @@ class TestF8AICoach:
     """F8.3 AI教练对话辅导"""
 
     def test_coach_chat_api(self, client):
-        resp = client.post("/api/v1/training/coach/chat", json={
-            "message": "如何做需求分析？", "learner_id": "test"
-        })
+        resp = client.post("/api/v1/training/coach/chat", json={"message": "如何做需求分析？", "learner_id": "test"})
         assert resp.status_code == 200
         reply = resp.json()["reply"]
         assert "reply" in reply
@@ -265,19 +290,32 @@ class TestF8AICoach:
 
     def test_coach_error_handling(self, training_agent):
         import asyncio
-        result = asyncio.run(training_agent.run({
-            "task_type": "coach_chat",
-            "message": "代码报错了怎么办？",
-        }))
+
+        result = asyncio.run(
+            training_agent.run(
+                {
+                    "task_type": "coach_chat",
+                    "message": "代码报错了怎么办？",
+                }
+            )
+        )
         assert result.success
-        assert "排查" in result.structured_output["reply"]["answer"] or "错误" in result.structured_output["reply"]["answer"]
+        assert (
+            "排查" in result.structured_output["reply"]["answer"]
+            or "错误" in result.structured_output["reply"]["answer"]
+        )
 
     def test_coach_socratic_style(self, training_agent):
         import asyncio
-        result = asyncio.run(training_agent.run({
-            "task_type": "coach_chat",
-            "message": "怎么做方案设计？",
-        }))
+
+        result = asyncio.run(
+            training_agent.run(
+                {
+                    "task_type": "coach_chat",
+                    "message": "怎么做方案设计？",
+                }
+            )
+        )
         answer = result.structured_output["reply"]["answer"]
         # 苏格拉底式：包含提问引导
         assert "？" in answer or "分析" in answer
@@ -287,9 +325,7 @@ class TestF8Sandbox:
     """F8.4 实战演练沙箱"""
 
     def test_start_sandbox_api(self, client):
-        resp = client.post("/api/v1/training/sandbox/start", json={
-            "scenario": "research", "difficulty": "beginner"
-        })
+        resp = client.post("/api/v1/training/sandbox/start", json={"scenario": "research", "difficulty": "beginner"})
         assert resp.status_code == 200
         sandbox = resp.json()["sandbox"]["sandbox"]
         assert sandbox["status"] == "ready"
@@ -298,10 +334,15 @@ class TestF8Sandbox:
 
     def test_sandbox_full_delivery(self, training_agent):
         import asyncio
-        result = asyncio.run(training_agent.run({
-            "task_type": "start_sandbox",
-            "scenario": "full_delivery",
-        }))
+
+        result = asyncio.run(
+            training_agent.run(
+                {
+                    "task_type": "start_sandbox",
+                    "scenario": "full_delivery",
+                }
+            )
+        )
         assert result.success
         tasks = result.structured_output["sandbox"]["tasks"]
         assert len(tasks) == 6  # 完整交付6个任务
@@ -312,11 +353,14 @@ class TestF8Sandbox:
         sandbox_id = resp.json()["sandbox"]["sandbox"]["sandbox_id"]
         task_id = resp.json()["sandbox"]["sandbox"]["tasks"][0]["id"]
         # 提交作业
-        resp = client.post("/api/v1/training/sandbox/submit", json={
-            "sandbox_id": sandbox_id,
-            "task_id": task_id,
-            "work": "这是我的方案设计作业，包含产品方案和技术方案...",
-        })
+        resp = client.post(
+            "/api/v1/training/sandbox/submit",
+            json={
+                "sandbox_id": sandbox_id,
+                "task_id": task_id,
+                "work": "这是我的方案设计作业，包含产品方案和技术方案...",
+            },
+        )
         assert resp.status_code == 200
         feedback = resp.json()["feedback"]
         assert "score" in feedback["feedback"]
@@ -344,10 +388,15 @@ class TestF8KnowledgeBase:
 
     def test_knowledge_structure(self, training_agent):
         import asyncio
-        result = asyncio.run(training_agent.run({
-            "task_type": "search_knowledge",
-            "query": "Badcase",
-        }))
+
+        result = asyncio.run(
+            training_agent.run(
+                {
+                    "task_type": "search_knowledge",
+                    "query": "Badcase",
+                }
+            )
+        )
         results = result.structured_output["results"]
         for r in results:
             assert "title" in r
@@ -360,9 +409,7 @@ class TestF8ExamCertification:
     """F8.7 能力评估与认证"""
 
     def test_take_exam_api(self, client):
-        resp = client.post("/api/v1/training/exam", json={
-            "target_level": "L3", "learner_id": "exam-test"
-        })
+        resp = client.post("/api/v1/training/exam", json={"target_level": "L3", "learner_id": "exam-test"})
         assert resp.status_code == 200
         exam = resp.json()["exam_result"]
         assert "total_score" in exam
@@ -372,10 +419,15 @@ class TestF8ExamCertification:
 
     def test_exam_sections(self, training_agent):
         import asyncio
-        result = asyncio.run(training_agent.run({
-            "task_type": "take_exam",
-            "target_level": "L3",
-        }))
+
+        result = asyncio.run(
+            training_agent.run(
+                {
+                    "task_type": "take_exam",
+                    "target_level": "L3",
+                }
+            )
+        )
         sections = result.structured_output["sections"]
         section_names = [s["name"] for s in sections]
         assert "理论知识" in section_names
@@ -384,12 +436,17 @@ class TestF8ExamCertification:
 
     def test_certification_after_pass(self, training_agent):
         import asyncio
+
         # 多次考核直到通过（mock评分通常70-85分，L3阈值70）
         for _ in range(3):
-            result = asyncio.run(training_agent.run({
-                "task_type": "take_exam",
-                "target_level": "L3",
-            }))
+            result = asyncio.run(
+                training_agent.run(
+                    {
+                        "task_type": "take_exam",
+                        "target_level": "L3",
+                    }
+                )
+            )
             if result.structured_output["passed"]:
                 assert "certification" in result.structured_output
                 cert = result.structured_output["certification"]
@@ -411,32 +468,48 @@ class TestF8EndToEnd:
         learner_id = "journey-test"
 
         # 1. 能力评估
-        resp = client.post("/api/v1/training/assess", json={
-            "learner_id": learner_id,
-            "background": {"ai_experience_years": 0, "dev_experience_years": 0},
-        })
+        resp = client.post(
+            "/api/v1/training/assess",
+            json={
+                "learner_id": learner_id,
+                "background": {"ai_experience_years": 0, "dev_experience_years": 0},
+            },
+        )
         assert resp.status_code == 200
         level = resp.json()["assessment"]["overall_level"]
         assert level in ["L1", "L2"]  # 零基础应为L1，边界可能L2
 
         # 2. 生成学习路径
-        resp = client.post("/api/v1/training/learning-path", json={
-            "learner_id": learner_id, "target_level": "L3", "current_level": "L1",
-        })
+        resp = client.post(
+            "/api/v1/training/learning-path",
+            json={
+                "learner_id": learner_id,
+                "target_level": "L3",
+                "current_level": "L1",
+            },
+        )
         assert resp.status_code == 200
         assert len(resp.json()["learning_path"]["weekly_plan"]) == 6
 
         # 3. AI教练对话
-        resp = client.post("/api/v1/training/coach/chat", json={
-            "learner_id": learner_id, "message": "RAG是什么？",
-        })
+        resp = client.post(
+            "/api/v1/training/coach/chat",
+            json={
+                "learner_id": learner_id,
+                "message": "RAG是什么？",
+            },
+        )
         assert resp.status_code == 200
         assert len(resp.json()["reply"]["reply"]["answer"]) > 10
 
         # 4. 启动沙箱
-        resp = client.post("/api/v1/training/sandbox/start", json={
-            "learner_id": learner_id, "scenario": "research",
-        })
+        resp = client.post(
+            "/api/v1/training/sandbox/start",
+            json={
+                "learner_id": learner_id,
+                "scenario": "research",
+            },
+        )
         assert resp.status_code == 200
         assert resp.json()["sandbox"]["sandbox"]["status"] == "ready"
 
@@ -446,9 +519,13 @@ class TestF8EndToEnd:
         assert resp.json()["results"]["total"] > 0
 
         # 6. 参加考核
-        resp = client.post("/api/v1/training/exam", json={
-            "learner_id": learner_id, "target_level": "L3",
-        })
+        resp = client.post(
+            "/api/v1/training/exam",
+            json={
+                "learner_id": learner_id,
+                "target_level": "L3",
+            },
+        )
         assert resp.status_code == 200
         assert "total_score" in resp.json()["exam_result"]
 

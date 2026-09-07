@@ -1,7 +1,9 @@
 """
 API集成测试
 """
+
 import os
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -18,12 +20,15 @@ def client(tmp_path):
 @pytest.fixture
 def test_project(client):
     """创建测试项目"""
-    response = client.post("/api/v1/projects", json={
-        "name": "测试项目",
-        "client_name": "测试客户",
-        "industry": "制造业",
-        "description": "用于API测试的项目",
-    })
+    response = client.post(
+        "/api/v1/projects",
+        json={
+            "name": "测试项目",
+            "client_name": "测试客户",
+            "industry": "制造业",
+            "description": "用于API测试的项目",
+        },
+    )
     return response.json()["project"]
 
 
@@ -43,10 +48,13 @@ class TestProjectAPI:
     """项目管理API测试"""
 
     def test_create_project(self, client):
-        response = client.post("/api/v1/projects", json={
-            "name": "新项目",
-            "client_name": "客户A",
-        })
+        response = client.post(
+            "/api/v1/projects",
+            json={
+                "name": "新项目",
+                "client_name": "客户A",
+            },
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True

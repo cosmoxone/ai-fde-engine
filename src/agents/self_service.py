@@ -3,6 +3,7 @@
 核心能力：引导式项目创建、AI落地机会识别、需求自助梳理、方案自助配置、原型生成、智能纠偏
 设计理念：非技术用户友好、Agent全程引导、后台实时赋能
 """
+
 from __future__ import annotations
 
 import time
@@ -10,12 +11,13 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from .base import BaseAgent, AgentResult, AgentCapability
+from .base import AgentCapability, AgentResult, BaseAgent
 
 
 @dataclass
 class GuidanceStep:
     """引导步骤"""
+
     step_id: str
     step_name: str
     description: str
@@ -30,6 +32,7 @@ class GuidanceStep:
 @dataclass
 class AIOpportunity:
     """AI落地机会"""
+
     opportunity_id: str
     title: str
     description: str
@@ -45,6 +48,7 @@ class AIOpportunity:
 @dataclass
 class ValueMetric:
     """价值指标"""
+
     metric_id: str
     name: str
     category: str  # efficiency/cost/quality/satisfaction
@@ -211,7 +215,7 @@ class SelfServiceAgent(BaseAgent):
     async def run(self, input_data: dict[str, Any]) -> AgentResult:
         """
         执行自助服务任务
-        task_type: 
+        task_type:
           - identify_opportunities: AI落地机会识别
           - guide_requirement: 需求自助梳理引导
           - configure_solution: 方案自助配置
@@ -272,9 +276,7 @@ class SelfServiceAgent(BaseAgent):
         pain_points = input_data.get("pain_points", [])
 
         # Mock模式：基于业务描述生成AI落地机会
-        opportunities = self._mock_identify_opportunities(
-            business_description, industry, pain_points
-        )
+        opportunities = self._mock_identify_opportunities(business_description, industry, pain_points)
 
         self.opportunities = opportunities
 
@@ -483,9 +485,7 @@ class SelfServiceAgent(BaseAgent):
             },
         )
 
-    def _mock_generate_solution(
-        self, modules: list[str], deployment: str, integration: str
-    ) -> dict[str, Any]:
+    def _mock_generate_solution(self, modules: list[str], deployment: str, integration: str) -> dict[str, Any]:
         """Mock生成方案"""
         base_cost = 50000 if deployment == "saas" else 150000
         module_cost = len(modules) * 20000
@@ -631,55 +631,63 @@ class SelfServiceAgent(BaseAgent):
         if requirements:
             vague_count = sum(1 for r in requirements if len(str(r.get("description", ""))) < 20)
             if vague_count > len(requirements) * 0.5:
-                alerts.append({
-                    "alert_id": f"dev-{uuid.uuid4().hex[:8]}",
-                    "type": "vague_requirement",
-                    "severity": "medium",
-                    "message": "超过50%的需求描述过于模糊（少于20字），建议补充详细描述",
-                    "suggestion": "为每个需求补充：具体功能、使用场景、验收标准",
-                    "auto_fix_available": True,
-                })
+                alerts.append(
+                    {
+                        "alert_id": f"dev-{uuid.uuid4().hex[:8]}",
+                        "type": "vague_requirement",
+                        "severity": "medium",
+                        "message": "超过50%的需求描述过于模糊（少于20字），建议补充详细描述",
+                        "suggestion": "为每个需求补充：具体功能、使用场景、验收标准",
+                        "auto_fix_available": True,
+                    }
+                )
 
         # 检测2：选择了过多功能模块（MVP原则）
         selected_modules = data.get("selected_modules", [])
         if len(selected_modules) > 5:
-            alerts.append({
-                "alert_id": f"dev-{uuid.uuid4().hex[:8]}",
-                "type": "scope_creep",
-                "severity": "high",
-                "message": f"选择了{len(selected_modules)}个功能模块，超出MVP建议范围（≤5个）",
-                "suggestion": "建议优先选择3-5个核心功能，其他功能放入二期规划",
-                "auto_fix_available": False,
-                "needs_fde_review": True,
-            })
+            alerts.append(
+                {
+                    "alert_id": f"dev-{uuid.uuid4().hex[:8]}",
+                    "type": "scope_creep",
+                    "severity": "high",
+                    "message": f"选择了{len(selected_modules)}个功能模块，超出MVP建议范围（≤5个）",
+                    "suggestion": "建议优先选择3-5个核心功能，其他功能放入二期规划",
+                    "auto_fix_available": False,
+                    "needs_fde_review": True,
+                }
+            )
 
         # 检测3：预算与功能不匹配
         budget = data.get("budget", 0)
         if budget and budget < 50000 and len(selected_modules) > 3:
-            alerts.append({
-                "alert_id": f"dev-{uuid.uuid4().hex[:8]}",
-                "type": "budget_mismatch",
-                "severity": "high",
-                "message": f"预算{budget}元不足以支撑{len(selected_modules)}个功能模块",
-                "suggestion": "建议减少功能模块或增加预算，或联系FDE获取性价比方案",
-                "auto_fix_available": False,
-                "needs_fde_review": True,
-            })
+            alerts.append(
+                {
+                    "alert_id": f"dev-{uuid.uuid4().hex[:8]}",
+                    "type": "budget_mismatch",
+                    "severity": "high",
+                    "message": f"预算{budget}元不足以支撑{len(selected_modules)}个功能模块",
+                    "suggestion": "建议减少功能模块或增加预算，或联系FDE获取性价比方案",
+                    "auto_fix_available": False,
+                    "needs_fde_review": True,
+                }
+            )
 
         # 检测4：跳过关键步骤
         skipped_steps = data.get("skipped_steps", [])
         critical_steps = ["requirement", "solution"]
         skipped_critical = [s for s in skipped_steps if s in critical_steps]
         if skipped_critical:
-            alerts.append({
-                "alert_id": f"dev-{uuid.uuid4().hex[:8]}",
-                "type": "skipped_critical_step",
-                "severity": "high",
-                "message": f"跳过了关键步骤：{', '.join(skipped_critical)}",
-                "suggestion": "关键步骤不可跳过，建议返回完成",
-                "auto_fix_available": False,
-                "needs_fde_review": True,
-            })
+            alerts.append(
+                {
+                    "alert_id": f"dev-{uuid.uuid4().hex[:8]}",
+                    "type": "skipped_critical_step",
+                    "severity": "high",
+                    "message": f"跳过了关键步骤：{', '.join(skipped_critical)}",
+                    "suggestion": "关键步骤不可跳过，建议返回完成",
+                    "auto_fix_available": False,
+                    "needs_fde_review": True,
+                }
+            )
 
         return alerts
 
@@ -746,9 +754,12 @@ class SelfServiceAgent(BaseAgent):
             },
         )
 
-    def _complete_step_sync(self, step_id: str, confirmation: bool = False, user_input: Optional[dict] = None) -> AgentResult:
+    def _complete_step_sync(
+        self, step_id: str, confirmation: bool = False, user_input: Optional[dict] = None
+    ) -> AgentResult:
         """同步包装：完成引导步骤（供测试和同步调用场景使用）"""
         import asyncio
+
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
@@ -756,11 +767,15 @@ class SelfServiceAgent(BaseAgent):
                 return self._complete_step_internal(step_id, confirmation, user_input)
         except RuntimeError:
             pass
-        return asyncio.run(self._complete_step({
-            "step_id": step_id,
-            "confirmation": confirmation,
-            "user_input": user_input or {},
-        }))
+        return asyncio.run(
+            self._complete_step(
+                {
+                    "step_id": step_id,
+                    "confirmation": confirmation,
+                    "user_input": user_input or {},
+                }
+            )
+        )
 
     def _complete_step_internal(self, step_id: str, confirmation: bool, user_input: Optional[dict]) -> AgentResult:
         """完成引导步骤的内部逻辑（同步版本）"""
@@ -857,31 +872,121 @@ class SelfServiceAgent(BaseAgent):
         """Mock：基于阶段和等级生成培训内容"""
         content_map = {
             "enlightenment": [
-                {"id": "t1", "title": "AI能做什么：3分钟了解AI应用场景", "type": "video", "duration_min": 3, "level": "L1"},
-                {"id": "t2", "title": "如何描述你的业务痛点（模板+示例）", "type": "article", "duration_min": 5, "level": "L1"},
-                {"id": "t3", "title": "ROI怎么算：AI项目投资回报快速评估", "type": "interactive", "duration_min": 8, "level": "L2"},
+                {
+                    "id": "t1",
+                    "title": "AI能做什么：3分钟了解AI应用场景",
+                    "type": "video",
+                    "duration_min": 3,
+                    "level": "L1",
+                },
+                {
+                    "id": "t2",
+                    "title": "如何描述你的业务痛点（模板+示例）",
+                    "type": "article",
+                    "duration_min": 5,
+                    "level": "L1",
+                },
+                {
+                    "id": "t3",
+                    "title": "ROI怎么算：AI项目投资回报快速评估",
+                    "type": "interactive",
+                    "duration_min": 8,
+                    "level": "L2",
+                },
             ],
             "requirement": [
-                {"id": "t4", "title": "需求梳理方法论：从业务描述到可执行需求", "type": "video", "duration_min": 10, "level": "L2"},
-                {"id": "t5", "title": "如何写好验收标准（SMART原则+示例）", "type": "article", "duration_min": 6, "level": "L2"},
-                {"id": "t6", "title": "MVP原则：第一期做什么不做什么", "type": "interactive", "duration_min": 12, "level": "L3"},
+                {
+                    "id": "t4",
+                    "title": "需求梳理方法论：从业务描述到可执行需求",
+                    "type": "video",
+                    "duration_min": 10,
+                    "level": "L2",
+                },
+                {
+                    "id": "t5",
+                    "title": "如何写好验收标准（SMART原则+示例）",
+                    "type": "article",
+                    "duration_min": 6,
+                    "level": "L2",
+                },
+                {
+                    "id": "t6",
+                    "title": "MVP原则：第一期做什么不做什么",
+                    "type": "interactive",
+                    "duration_min": 12,
+                    "level": "L3",
+                },
             ],
             "solution": [
-                {"id": "t7", "title": "技术方案怎么看：非技术人员的方案评审指南", "type": "video", "duration_min": 15, "level": "L2"},
-                {"id": "t8", "title": "SaaS vs 私有化部署：如何选择", "type": "article", "duration_min": 8, "level": "L3"},
-                {"id": "t9", "title": "成本构成详解：开发费+维护费+隐藏成本", "type": "interactive", "duration_min": 10, "level": "L3"},
+                {
+                    "id": "t7",
+                    "title": "技术方案怎么看：非技术人员的方案评审指南",
+                    "type": "video",
+                    "duration_min": 15,
+                    "level": "L2",
+                },
+                {
+                    "id": "t8",
+                    "title": "SaaS vs 私有化部署：如何选择",
+                    "type": "article",
+                    "duration_min": 8,
+                    "level": "L3",
+                },
+                {
+                    "id": "t9",
+                    "title": "成本构成详解：开发费+维护费+隐藏成本",
+                    "type": "interactive",
+                    "duration_min": 10,
+                    "level": "L3",
+                },
             ],
             "prototype": [
-                {"id": "t10", "title": "原型试用指南：怎么试才能发现真问题", "type": "video", "duration_min": 8, "level": "L2"},
-                {"id": "t11", "title": "如何写有效的反馈（模板+反例）", "type": "article", "duration_min": 5, "level": "L2"},
+                {
+                    "id": "t10",
+                    "title": "原型试用指南：怎么试才能发现真问题",
+                    "type": "video",
+                    "duration_min": 8,
+                    "level": "L2",
+                },
+                {
+                    "id": "t11",
+                    "title": "如何写有效的反馈（模板+反例）",
+                    "type": "article",
+                    "duration_min": 5,
+                    "level": "L2",
+                },
             ],
             "decision": [
-                {"id": "t12", "title": "AI项目决策清单：上线前必须确认的10件事", "type": "checklist", "duration_min": 10, "level": "L3"},
-                {"id": "t13", "title": "合同与SLA：AI项目合同关键条款解读", "type": "article", "duration_min": 12, "level": "L4"},
+                {
+                    "id": "t12",
+                    "title": "AI项目决策清单：上线前必须确认的10件事",
+                    "type": "checklist",
+                    "duration_min": 10,
+                    "level": "L3",
+                },
+                {
+                    "id": "t13",
+                    "title": "合同与SLA：AI项目合同关键条款解读",
+                    "type": "article",
+                    "duration_min": 12,
+                    "level": "L4",
+                },
             ],
             "completed": [
-                {"id": "t14", "title": "AI项目运营手册：上线后持续优化指南", "type": "guide", "duration_min": 20, "level": "L3"},
-                {"id": "t15", "title": "进阶：如何在企业内部推广AI应用", "type": "video", "duration_min": 15, "level": "L4"},
+                {
+                    "id": "t14",
+                    "title": "AI项目运营手册：上线后持续优化指南",
+                    "type": "guide",
+                    "duration_min": 20,
+                    "level": "L3",
+                },
+                {
+                    "id": "t15",
+                    "title": "进阶：如何在企业内部推广AI应用",
+                    "type": "video",
+                    "duration_min": 15,
+                    "level": "L4",
+                },
             ],
         }
         contents = content_map.get(stage, content_map["enlightenment"])
@@ -1057,9 +1162,27 @@ class SelfServiceAgent(BaseAgent):
                 "客户计划在下个月内部决策会议上汇报",
             ],
             "action_items": [
-                {"id": "a1", "item": "评估数据导出功能的开发工作量", "owner": "FDE工程师", "due": "3天内", "priority": "high"},
-                {"id": "a2", "item": "准备私有化部署方案和报价", "owner": "FDE工程师", "due": "1周内", "priority": "medium"},
-                {"id": "a3", "item": "准备客户内部汇报材料（价值+案例）", "owner": "AI落地合伙人", "due": "1周内", "priority": "high"},
+                {
+                    "id": "a1",
+                    "item": "评估数据导出功能的开发工作量",
+                    "owner": "FDE工程师",
+                    "due": "3天内",
+                    "priority": "high",
+                },
+                {
+                    "id": "a2",
+                    "item": "准备私有化部署方案和报价",
+                    "owner": "FDE工程师",
+                    "due": "1周内",
+                    "priority": "medium",
+                },
+                {
+                    "id": "a3",
+                    "item": "准备客户内部汇报材料（价值+案例）",
+                    "owner": "AI落地合伙人",
+                    "due": "1周内",
+                    "priority": "high",
+                },
             ],
             "concerns": ["数据安全", "部署方式", "决策时间线"],
             "next_fde_action": "3天内提供数据导出功能评估和私有化部署方案，1周内准备汇报材料",
