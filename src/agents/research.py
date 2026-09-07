@@ -153,6 +153,7 @@ class ResearchAgent(BaseAgent):
                     user_prompt=prompt,
                     temperature=0.2,
                     response_json=True,
+                    required_keys=["summary", "business_process", "data_assets", "benchmark", "requirements"],
                 )
                 if parsed_json:
                     # LLM返回的JSON可能不完整，用mock结果补充缺失字段

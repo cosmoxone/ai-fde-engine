@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from .base import AgentResult, BaseAgent
@@ -85,9 +86,83 @@ class DesignAgent(BaseAgent):
         benchmark: dict,
         memory_context: str,
     ) -> dict[str, Any]:
-        """执行三方案设计（调用LLM，MVP使用模拟）"""
-        # 实际部署中调用LLM
-        # MVP模拟结果
+        """执行三方案设计（v0.1.2 B3：接入真实LLM + schema校验重试，失败回退mock）"""
+        mock_result = self._mock_design(requirements, benchmark)
+
+        if self._has_real_llm():
+            try:
+                prompt = self._build_design_prompt(requirements, business_process, benchmark, memory_context)
+                content_text, design_json = await self._call_llm(
+                    user_prompt=prompt,
+                    temperature=0.3,
+                    response_json=True,
+                    required_keys=["summary", "product_solution", "tech_solution", "validation_solution"],
+                )
+                if design_json:
+                    for key, value in mock_result.items():
+                        if key not in design_json:
+                            design_json[key] = value
+                    return design_json
+            except Exception as e:
+                print(f"[DesignAgent] LLM设计失败，降级mock: {e}")
+
+        return mock_result
+
+    def _build_design_prompt(
+        self,
+        requirements: dict,
+        business_process: dict,
+        benchmark: dict,
+        memory_context: str,
+    ) -> str:
+        """构造三方案设计Prompt"""
+        req_text = json.dumps(requirements, ensure_ascii=False, default=str)[:8000]
+        bp_text = json.dumps(business_process, ensure_ascii=False, default=str)[:3000]
+        bench_text = json.dumps(benchmark, ensure_ascii=False, default=str)[:3000]
+        memory_text = memory_context[:2000] if memory_context else ""
+
+        return f"""基于以下需求基线，完成产品/技术/验证三方案设计。
+
+=== 需求基线 ===
+{req_text}
+
+=== 业务流程 ===
+{bp_text}
+
+=== Benchmark ===
+{bench_text}
+{f"=== 历史项目经验 ==={chr(10)}{memory_text}" if memory_text else ""}
+
+请输出JSON，包含以下字段：
+{{
+  "summary": "方案总结（150字以内）",
+  "product_solution": {{
+    "name": "产品名称",
+    "architecture_mermaid": "graph TD ...（Mermaid功能架构图）",
+    "features": [{{"id": "F1", "name": "功能名", "module": "所属模块", "description": "描述", "priority": "P0/P1/P2"}}],
+    "interaction_flows": ["交互流程描述"],
+    "role_permissions": [{{"role": "角色", "permissions": ["权限"]}}]
+  }},
+  "tech_solution": {{
+    "architecture_mermaid": "graph TD ...（Mermaid系统架构图）",
+    "tech_stack": [{{"layer": "层级", "choice": "选型", "reason": "量化依据"}}],
+    "interfaces": [{{"name": "接口名", "path": "/api/...", "method": "GET/POST", "description": "描述"}}],
+    "data_flow": "数据流描述",
+    "deployment": "部署方案",
+    "risks": [{{"risk": "风险", "impact": "影响", "mitigation": "应对"}}]
+  }},
+  "validation_solution": {{
+    "strategy": "测试策略",
+    "test_cases": [{{"id": "TC1", "name": "用例名", "type": "功能/性能/安全", "description": "描述", "acceptance": "验收标准"}}],
+    "evaluation_metrics": [{{"metric": "指标", "target": "目标值"}}],
+    "launch_checklist": ["上线检查项"]
+  }}
+}}
+
+设计原则：可执行优先（输出能指导开发）；每个技术选型给量化依据；验收标准必须可测量。"""
+
+    def _mock_design(self, requirements: dict, benchmark: dict) -> dict[str, Any]:
+        """MVP模拟三方案（无LLM Key或LLM失败时的兜底）"""
         return {
             "summary": "基于需求基线完成产品、技术、验证三方案设计，方案已通过交叉一致性校验。",
             "product_solution": {

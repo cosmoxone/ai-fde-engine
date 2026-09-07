@@ -98,9 +98,15 @@ class BaseAgent(ABC):
         model: Optional[str] = None,
         temperature: float = 0.3,
         response_json: bool = False,
+        required_keys: Optional[list[str]] = None,
+        max_retries: int = 1,
     ) -> tuple[str, dict]:
         """
-        调用LLM的统一入口
+        调用LLM的统一入口（v0.1.2 B3：schema校验+失败自动重试）
+
+        Args:
+            required_keys: parsed_json 必须包含的顶层字段（缺失触发重试）
+            max_retries: 校验失败后的重试次数（重试时附带缺失字段提示）
 
         Returns:
             (content_text, parsed_json_dict)
@@ -115,20 +121,35 @@ class BaseAgent(ABC):
             LLMMessage("user", user_prompt),
         ]
 
-        if response_json:
-            response, parsed = await self.llm.chat_json(
-                messages=messages,
-                model=model,
-                temperature=temperature,
-            )
-            return response.content, parsed
-        else:
+        if not response_json:
             response = await self.llm.chat(
                 messages=messages,
                 model=model,
                 temperature=temperature,
             )
             return response.content, {}
+
+        attempt = 0
+        while True:
+            response, parsed = await self.llm.chat_json(
+                messages=messages,
+                model=model,
+                temperature=temperature,
+            )
+            missing = [k for k in (required_keys or []) if k not in parsed] if parsed else (required_keys or [])
+            if parsed and not missing:
+                return response.content, parsed
+            if attempt >= max_retries:
+                # 重试仍失败：返回已有解析结果（调用方用mock兜底补齐）
+                return response.content, parsed
+            attempt += 1
+            # 带错误反馈重试，并显式附schema提示
+            feedback = (
+                f"你上次的输出缺少必需字段：{missing}。"
+                f"请重新输出完整JSON，必须包含全部字段：{required_keys}。只输出JSON，不要其他文字。"
+            )
+            messages.append(LLMMessage("assistant", response.content[:2000]))
+            messages.append(LLMMessage("user", feedback))
 
     def _has_real_llm(self) -> bool:
         """检查是否配置了真实LLM API Key"""
