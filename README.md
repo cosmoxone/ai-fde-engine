@@ -5,15 +5,15 @@
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.1-orange.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-392%20passed-brightgreen.svg)](tests/)
+[![Version](https://img.shields.io/badge/version-0.1.2-orange.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-438%20passed-brightgreen.svg)](tests/)
 [![CI](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml)
 
 ## 当前状态（请先阅读）
 
 本项目处于 **v0.1.x（0.x 系列，API 可能调整）** 阶段，采用「接口真实 + 实现可切换」架构：
 
-- ✅ **开箱可跑**：仅安装核心依赖（`requirements-core.txt`）、零 API Key，全部功能以 Mock/降级模式运行，392 个测试全绿
+- ✅ **开箱可跑**：仅安装核心依赖（`requirements-core.txt`）、零 API Key，全部功能以 Mock/降级模式运行，438 个测试全绿
 - ✅ **一键切换生产组件**：配置 `.env` 即可切换 DeepSeek/Qwen LLM、Docling 解析、Qdrant 知识库、DeepEval 评测、Aider 代码生成、Mem0 记忆（见 [模块切换指南](docs/05-模块切换指南.md)）
 - ✅ **数据本地持久化（v0.1.1）**：SQLite 单文件 `data/aifde.db`，重启/升级数据不丢
 - ⚠️ **已知边界**：夜间迭代需手动触发（后续版本进程内定时）；项目定位**本机/单容器**使用，API 无认证——请勿暴露公网。路线图见 [docs/09-后续规划.md](docs/09-后续规划.md)：开源主线聚焦单机开箱即用与交付价值，企业级特性（多用户/PostgreSQL/多租户）在商业轨道单独演进
@@ -96,7 +96,7 @@ docker compose -f docker-compose.full.yml ps
 ### 方式三：本地开发
 
 ```bash
-# 1. 安装核心依赖（Mock模式，零API Key可运行全部功能与392个测试）
+# 1. 安装核心依赖（Mock模式，零API Key可运行全部功能与438个测试）
 pip install -r requirements-core.txt
 pip install -e ".[dev]"
 
@@ -274,7 +274,7 @@ make test-cov
 make lint
 ```
 
-测试覆盖（共 392 个，全部通过）：
+测试覆盖（共 438 个，全部通过）：
 - 存储契约测试（42）：memory/sqlite 双实现契约、重启持久化、线程安全（v0.1.1）
 - 扩展点测试（10）：插件注册器、认证注入（v0.1.1）
 - 配置模块测试（9）
@@ -288,6 +288,10 @@ make lint
 - 自助交付测试（45）：F7引导流程/机会识别/纠偏/审核
 - 培训模块测试（34）：F8能力模型/学习路径/沙箱/教练
 - UAT场景测试（77）：分角色验收场景
+- 交付物导出测试（14）：MD/DOCX/zip渲染与API（v0.1.2 B1）
+- 行业模板测试（17）：三行业包/匹配/注入/扩展点（v0.1.2 B2）
+- LLM质量测试（8）：schema重试/Design LLM接入/黄金集（v0.1.2 B3）
+- Badcase闭环测试（9）：入库/建议/自动归集（v0.1.2 B5）
 
 > 需求-用例-脚本追踪见 [测试用例追踪矩阵](docs/08-测试用例追踪矩阵.md)。
 
@@ -358,7 +362,7 @@ docker compose -f docker-compose.full.yml restart ai-fde-app
 1. Fork 项目
 2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
 3. 提交更改（遵循 [Conventional Commits](https://www.conventionalcommits.org/zh-hans/)）
-4. 确保 `make lint` 与 `make test`（392 个测试）通过
+4. 确保 `make lint` 与 `make test`（438 个测试）通过
 5. 推送分支并开启 Pull Request
 
 ## 许可证

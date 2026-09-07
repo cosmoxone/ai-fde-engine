@@ -3,6 +3,23 @@
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.1.2] - 2026-09-07
+
+### Added
+
+- **交付物导出（B1）**：`GET /projects/{id}/export?format=md|docx` 打包 6 类交付物（项目概览/需求基线/三方案/Benchmark 测试集/迭代报告/评审记录）为 zip；Markdown 零依赖渲染，DOCX 由 python-docx 渲染（未安装自动降级 MD）；Dashboard 项目列表一键导出
+- **行业模板库（B2）**：内置制造业质检/金融客服/政务问答三个行业包（调研行业上下文/需求模板/行业 Benchmark 种子含对抗安全样例/方案骨架）；创建项目按行业自动匹配注入；`GET /api/v1/templates`；TemplateSource 扩展点（TE 订阅源可替换）
+- **真实 LLM 输出打磨（B3）**：`_call_llm` 增加 required_keys 校验 + 带反馈自动重试；**DesignAgent 补齐真实 LLM 路径**（原为纯 mock）；20 条需求基线黄金集（制造 8/金融 6/政务 6）+ 命中率评估 CLI（`python -m src.evaluation.golden`）
+- **Badcase 修复建议闭环（B5）**：Badcase 持久化入库；夜间迭代自动归集未处理 badcase、处理完标记版本；不可自动修复的 badcase 输出**修复建议**（业务规则确认草稿/拒答话术+防回归用例）供 FDE 晨间采纳；Dashboard 质量中心 10 秒提交 Badcase
+
+### Changed
+
+- 测试 392 → **438**（导出 14/模板 17/LLM 质量 8/Badcase 闭环 9 + 契约扩展）
+
+### Deferred
+
+- B4 可编辑确认流、B6 用户手册顺延至 v0.1.2.x 收尾迭代（见 docs/09）
+
 ## [0.1.1] - 2026-09-07
 
 ### Added

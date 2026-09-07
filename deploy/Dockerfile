@@ -29,7 +29,7 @@ FROM python:3.11-slim AS runtime
 
 LABEL maintainer="AI-FDE Team"
 LABEL description="AI驱动的FDE交付引擎"
-LABEL version="0.1.1"
+LABEL version="0.1.2"
 
 WORKDIR /app
 

@@ -40,7 +40,7 @@ class TestHealthAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
-        assert data["version"] == "0.1.1"
+        assert data["version"] == "0.1.2"
         assert "services" in data
 
 
