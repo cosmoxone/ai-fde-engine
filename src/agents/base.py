@@ -135,6 +135,7 @@ class BaseAgent(ABC):
                 messages=messages,
                 model=model,
                 temperature=temperature,
+                max_tokens=12000,  # v0.3.0：推理模型（think段）+大JSON需更高预算，4096易截断→mock兜底
             )
             missing = [k for k in (required_keys or []) if k not in parsed] if parsed else (required_keys or [])
             if parsed and not missing:
