@@ -3,6 +3,21 @@
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.3.0] - 2026-09-08
+
+### Added — 四大卖点定位（生态集成版）
+
+**定位重构**：本项目深做卖点 1+2（本体抽取/需求分析、自动知识库/Benchmark），卖点 3/4 通过生态集成编排：
+- **卖点3 night-factory 集成**：`GET /delivery/tickets`（需求基线→工单，schema 兼容 night-factory tasks/*.json）；**核心衔接：需求量化验收标准 → 工单 acceptance[]**（验证前置跨产品贯穿）；priority→预算映射（P0=high）
+- **卖点4 RPA 编排**：`POST /benchmarks/{id}/rpa-dispatch`（webhook 契约见 rpa_runner.py；未配置返回 pending_integration）
+- **夜间迭代定时调度**（遗留L2-1收口）：零依赖进程内调度，`iteration_cron="HH:MM"` 每日触发全部项目，空/旧格式自动关闭
+- `docs/benchmarks/golden-real.md` 真实 LLM 报告占位（待 API Key 生成，含决策原则：达标才宣传）
+- README 中英重构为四大卖点叙事表
+
+### Changed
+
+- 测试 470 → **479**（生态集成 9 条）
+
 ## [0.2.1] - 2026-09-07
 
 ### Added

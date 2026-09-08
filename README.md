@@ -7,22 +7,33 @@
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.1-orange.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-470%20passed-brightgreen.svg)](tests/)
+[![Version](https://img.shields.io/badge/version-0.3.0-orange.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-479%20passed-brightgreen.svg)](tests/)
 [![CI](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml)
 
 ## 当前状态（请先阅读）
 
 本项目处于 **v0.1.x（0.x 系列，API 可能调整）** 阶段，采用「接口真实 + 实现可切换」架构：
 
-- ✅ **开箱可跑**：仅安装核心依赖（`requirements-core.txt`）、零 API Key，全部功能以 Mock/降级模式运行，470 个测试全绿
+- ✅ **开箱可跑**：仅安装核心依赖（`requirements-core.txt`）、零 API Key，全部功能以 Mock/降级模式运行，479 个测试全绿
 - ✅ **一键切换生产组件**：配置 `.env` 即可切换 DeepSeek/Qwen LLM、Docling 解析、Qdrant 知识库、DeepEval 评测、Aider 代码生成、Mem0 记忆（见 [模块切换指南](docs/05-模块切换指南.md)）
 - ✅ **数据本地持久化（v0.1.1）**：SQLite 单文件 `data/aifde.db`，重启/升级数据不丢
 - ⚠️ **已知边界**：夜间迭代需手动触发（后续版本进程内定时）；项目定位**本机/单容器**使用，API 无认证——请勿暴露公网。路线图见 [docs/09-后续规划.md](docs/09-后续规划.md)：开源主线聚焦单机开箱即用与交付价值，企业级特性（多用户/PostgreSQL/多租户）在商业轨道单独演进
 
 ## 项目简介
 
-AI-FDE Engine 是一套面向FDE团队的AI化交付生产系统，把FDE从「手工作坊式交付」升级为「数据驱动的规模化交付」。
+AI-FDE Engine 是面向 FDE（Forward Deployed Engineer）的 **AI 落地交付引擎**——用四大能力把客户的一堆文档，变成可验收、可交付、可复用的 AI 落地项目。
+
+### 四大卖点
+
+| # | 能力 | 由谁实现 | 状态 |
+| --- | --- | --- | --- |
+| **1. 本体抽取与需求分析** | 从客户文档与主动调研中抽取业务本体：流程建模、数据资产盘点、**含量化验收标准的需求基线** | **本项目** | ✅ 核心 |
+| **2. 自动知识库 + 自动化 Benchmark** | 客户文档自动构建知识库；自动生成三分类测试集（高频/边界/对抗）+ 质量门禁 | **本项目** | ✅ 核心 |
+| **3. 大批量自动化 vibe coding** | 需求工单化 → 夜间无人值守批量编码（预算控制+机械化验收） | [night-factory](https://github.com/cosmoxone/night-factory)（兄弟项目），本项目**一键生成工单** | 🔗 集成 |
+| **4. 自动化测试与验收** | Benchmark 用例派发外部 RPA 执行，结果回流质量门禁 | 外部 RPA 项目，本项目**编排派发** | 🔌 编排位 |
+
+**贯穿四大卖点的方法论——验证前置**：需求阶段的量化验收标准（卖点1）成为夜间编码的机械化验收依据（卖点3）与 Benchmark 判定标准（卖点2/4）——一份标准，三处复用。
 
 ### 核心设计理念
 
@@ -98,7 +109,7 @@ docker compose -f docker-compose.full.yml ps
 ### 方式三：本地开发
 
 ```bash
-# 1. 安装核心依赖（Mock模式，零API Key可运行全部功能与470个测试）
+# 1. 安装核心依赖（Mock模式，零API Key可运行全部功能与479个测试）
 pip install -r requirements-core.txt
 pip install -e ".[dev]"
 
@@ -222,6 +233,9 @@ ai-fde-engine/
 | POST | `/api/v1/projects/{id}/iteration/run` | 触发夜间迭代 |
 | POST | `/api/v1/projects/{id}/badcases` | 提交Badcase反馈 |
 | GET | `/api/v1/projects/{id}/memory/search` | 检索项目记忆 |
+| GET | `/api/v1/projects/{id}/delivery/tickets` | **生成 night-factory 工单**（卖点3，验收标准→工单acceptance） |
+| GET | `/api/v1/projects/{id}/delivery/tickets/export` | 导出工单 JSON（放入 night-factory/tasks/ 即夜间派发） |
+| POST | `/api/v1/projects/{id}/benchmarks/{bid}/rpa-dispatch` | **Benchmark 派发外部 RPA 执行**（卖点4，需配置 RPA_WEBHOOK_URL） |
 | GET | `/api/v1/projects/{id}/progress` | 项目进度 |
 | GET | `/api/v1/tasks/{task_id}` | 任务状态 |
 | GET | `/api/v1/health` | 健康检查 |
@@ -276,7 +290,7 @@ make test-cov
 make lint
 ```
 
-测试覆盖（共 470 个，全部通过）：
+测试覆盖（共 479 个，全部通过）：
 - 存储契约测试（42）：memory/sqlite 双实现契约、重启持久化、线程安全（v0.1.1）
 - 扩展点测试（10）：插件注册器、认证注入（v0.1.1）
 - 配置模块测试（9）
@@ -299,6 +313,7 @@ make lint
 - 经验库测试（6）：跨项目检索/复盘报告（v0.2.0 D1）
 - 模板校验测试（11）：贡献红线（v0.2.0 D2）
 - 基准报告测试（3）：可复现基线（v0.2.0 D3）
+- 生态集成测试（9）：night-factory工单/RPA编排/调度（v0.3.0）
 
 > 需求-用例-脚本追踪见 [测试用例追踪矩阵](docs/08-测试用例追踪矩阵.md)。
 

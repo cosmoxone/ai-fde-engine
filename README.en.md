@@ -5,8 +5,8 @@
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110+-green.svg)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.1-orange.svg)](CHANGELOG.md)
-[![Tests](https://img.shields.io/badge/tests-470%20passed-brightgreen.svg)](tests/)
+[![Version](https://img.shields.io/badge/version-0.3.0-orange.svg)](CHANGELOG.md)
+[![Tests](https://img.shields.io/badge/tests-479%20passed-brightgreen.svg)](tests/)
 [![CI](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/cosmoxone/ai-fde-engine/actions/workflows/ci.yml)
 
 **中文文档** | [English](README.en.md)
@@ -15,14 +15,23 @@
 
 ## What is this?
 
-A local-first productivity tool that runs the **entire AI delivery workflow** for forward-deployed engineers:
+An AI delivery engine for FDEs (Forward Deployed Engineers) — built around **four selling points** that turn a pile of customer documents into a deliverable, verifiable AI project:
+
+| # | Capability | Implemented by | Status |
+| --- | --- | --- | --- |
+| **1. Ontology extraction & requirements analysis** | Extract business ontology from customer docs & research: process modeling, data-asset inventory, **requirements baseline with quantified acceptance criteria** | **This project** | ✅ core |
+| **2. Auto knowledge base + automated Benchmark** | Auto-build KB from docs; auto-generate 3-category test sets (high-freq/edge/adversarial) + quality gate | **This project** | ✅ core |
+| **3. Mass automated vibe coding** | Requirements → tickets → unattended overnight batch coding (budget-capped, mechanically verified) | [night-factory](https://github.com/cosmoxone/night-factory) (sister project); this project **generates tickets in one call** | 🔗 integrated |
+| **4. Automated testing & acceptance** | Benchmark cases dispatched to external RPA runner, results feed back into the quality gate | External RPA project; this project **orchestrates dispatch** | 🔌 orchestration slot |
+
+**The methodology that threads all four — verification-first**: quantified acceptance criteria defined at requirements time (SP1) become the mechanical acceptance for overnight coding (SP3) and the benchmark for testing (SP2/4). One standard, three uses.
 
 ```
 Customer docs → Research (requirements baseline w/ quantified acceptance)
              → Solution design (product/tech/validation, cross-checked)
              → Benchmark-first testing (50 cases: high-freq/edge/adversarial)
-             → Delivery → Badcase collection → Nightly iteration (auto-fix
-               or human-ready fix suggestions, quality-gated deployment)
+             → Delivery (night-factory tickets) → Badcase collection
+             → Nightly iteration (auto-fix or fix suggestions, quality-gated)
              → Deliverables export (DOCX/Markdown)
 ```
 
@@ -71,7 +80,7 @@ bash examples/run_demo.sh   # project → docs → research → benchmark → ni
 - **SQLite persistence** (v0.1.1): single file `data/aifde.db`, survives restarts
 - **26 MCP tools** (v0.1.4): drive the full workflow from Claude Desktop / Cursor
 - **Swappable providers**: DeepSeek/Qwen/Local LLMs, Docling, Qdrant, DeepEval, Aider, Mem0 — mock by default, one `.env` to switch ([switching guide](docs/05-模块切换指南.md))
-- **450 tests**, ruff-clean, CI on 3.11/3.12 + Docker smoke
+- **479 tests**, ruff-clean, CI on 3.11/3.12 + Docker smoke
 
 ## Editions (Open-Core)
 
