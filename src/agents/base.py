@@ -152,7 +152,9 @@ class BaseAgent(ABC):
             messages.append(LLMMessage("user", feedback))
 
     def _has_real_llm(self) -> bool:
-        """检查是否配置了真实LLM API Key"""
+        """检查是否配置了真实LLM API Key（v0.3.0：custom/openai/ollama 兼容端点同样视为真实）"""
+        if self.settings.llm_provider in ("openai", "ollama", "custom"):
+            return bool(self.settings.local_model_base_url)
         return bool(self.settings.deepseek_api_key or self.settings.qwen_api_key)
 
     def _default_capabilities(self) -> list[AgentCapability]:

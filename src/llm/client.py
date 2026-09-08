@@ -15,6 +15,13 @@ import httpx
 from src.config import get_settings
 
 
+def _strip_think(text: str) -> str:
+    """剥离推理模型（MiniMax-M/DeepSeek-R1类）的 <think>...</think> 思考段（v0.3.0）"""
+    if "</think>" in text:
+        return text.split("</think>", 1)[1].strip()
+    return text.strip()
+
+
 @dataclass
 class LLMMessage:
     role: str
@@ -39,14 +46,20 @@ class LLMResponse:
 
     def parse_json(self) -> dict:
         try:
-            content = self.content.strip()
+            content = _strip_think(self.content.strip())
             if content.startswith("```json"):
                 content = content[7:]
             if content.startswith("```"):
                 content = content[3:]
             if content.endswith("```"):
                 content = content[:-3]
-            return json.loads(content.strip())
+            content = content.strip()
+            # 非纯JSON输出：提取首个{ 到末个} 的子串（推理模型残留文本容错）
+            if not content.startswith("{"):
+                start, end = content.find("{"), content.rfind("}")
+                if start >= 0 and end > start:
+                    content = content[start : end + 1]
+            return json.loads(content)
         except (json.JSONDecodeError, ValueError):
             return {}
 
@@ -93,6 +106,11 @@ class LLMClient:
             return self.settings.deepseek_base_url, self.settings.deepseek_api_key, model
         elif model.startswith("qwen"):
             return self.settings.qwen_base_url, self.settings.qwen_api_key, model
+        elif self.settings.llm_provider in ("openai", "ollama", "custom") or model.startswith(
+            ("MiniMax", "minimax", "abab")
+        ):
+            # 自定义/本地/MiniMax 等 OpenAI 兼容端点（v0.3.0：MiniMax 已实测）
+            return self.settings.local_model_base_url, self.settings.local_model_api_key, model
         else:
             return self.settings.deepseek_base_url, self.settings.deepseek_api_key, model
 
@@ -138,7 +156,7 @@ class LLMClient:
                     msg = choice.get("message", {})
                     usage = data.get("usage", {})
                     result = LLMResponse(
-                        content=msg.get("content", ""),
+                        content=_strip_think(msg.get("content", "")),
                         model=actual_model,
                         usage=usage,
                         latency_ms=latency_ms,
