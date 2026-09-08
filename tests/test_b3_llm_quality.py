@@ -23,7 +23,7 @@ class TestCallLLMSchemaRetry:
     async def test_retry_on_missing_keys(self, agent):
         calls = []
 
-        async def fake_chat_json(messages, model, temperature):
+        async def fake_chat_json(messages, model, temperature, **kwargs):
             calls.append([m.content for m in messages])
             if len(calls) == 1:
                 return _FakeResp('{"summary": "only"}'), {"summary": "only"}
@@ -48,7 +48,7 @@ class TestCallLLMSchemaRetry:
 
     @pytest.mark.asyncio
     async def test_no_retry_when_valid(self, agent):
-        async def fake_chat_json(messages, model, temperature):
+        async def fake_chat_json(messages, model, temperature, **kwargs):
             return _FakeResp("{}"), {
                 "summary": "s",
                 "product_solution": {},
