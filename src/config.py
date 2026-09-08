@@ -143,7 +143,7 @@ class Settings(BaseSettings):
 
     # ===== 迭代流水线 =====
     iteration_enabled: bool = True
-    iteration_cron: str = "0 20 * * *"
+    iteration_cron: str = "0 20 * * *"  # v0.3.0 S4：进程内调度，格式 "HH:MM"（每日），空=关闭
     iteration_max_badcases: int = 20
     iteration_auto_deploy: bool = True
     iteration_auto_rollback: bool = True

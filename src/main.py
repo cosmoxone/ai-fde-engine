@@ -5,6 +5,7 @@ AI-FDE Engine 主应用入口 - FastAPI
 
 from __future__ import annotations
 
+import asyncio
 import os
 import uuid
 from contextlib import asynccontextmanager
@@ -67,8 +68,51 @@ async def lifespan(app: FastAPI):
     from .settings_runtime import load_runtime_settings
 
     load_runtime_settings()
+    # v0.3.0 S4：夜间迭代定时调度（零依赖进程内，iteration_cron="HH:MM" 每日，空=关闭）
+    scheduler = asyncio.create_task(_iteration_scheduler())
     yield
     # 关闭时清理
+    scheduler.cancel()
+
+
+async def _iteration_scheduler():
+    """每日定时触发全部项目的夜间迭代（自动归集各项目 open badcase）"""
+    import datetime
+
+    schedule = (settings.iteration_cron or "").strip()
+    if not schedule or ":" not in schedule:
+        return  # 关闭调度
+    try:
+        hh, mm = schedule.split(":")[:2]
+        target_h, target_m = int(hh), int(mm)
+    except ValueError:
+        print(f"[Scheduler] iteration_cron 格式非法（应为 HH:MM）: {schedule}，调度未启用")
+        return
+    print(f"[Scheduler] 夜间迭代调度已启用：每日 {target_h:02d}:{target_m:02d}")
+    last_fired = None
+    while True:
+        await asyncio.sleep(60)
+        now = datetime.datetime.now()
+        if (now.hour, now.minute) == (target_h, target_m) and last_fired != now.date():
+            last_fired = now.date()
+            from .pipeline.iteration import NightlyIterationPipeline
+
+            storage = get_storage()
+            for project in storage.list_projects():
+                badcases = storage.list_badcases(project["id"], status="open")
+                if not badcases:
+                    continue
+                try:
+                    result = await NightlyIterationPipeline(project["id"]).run(badcases, [])
+                    for bc in badcases:
+                        storage.update_badcase(
+                            bc.get("id", ""), {"status": "processed", "processed_version": result.version}
+                        )
+                    print(
+                        f"[Scheduler] {project.get('name', project['id'])} 定时迭代完成：{result.version} 门禁{'✅' if result.gate_passed else '❌'}"
+                    )
+                except Exception as e:  # noqa: BLE001
+                    print(f"[Scheduler] {project['id']} 定时迭代失败: {e}")
 
 
 app = FastAPI(
@@ -841,6 +885,75 @@ async def edit_solution_feature(project_id: str, feature_id: str, req: FeatureEd
 
     storage.update_project(project_id, {"solutions": solutions})
     return {"success": True, "feature": target}
+
+
+# ===== 外部生态集成（v0.3.0 卖点3/4 编排）=====
+
+
+@app.get("/api/v1/projects/{project_id}/delivery/tickets")
+async def generate_delivery_tickets(project_id: str):
+    """
+    卖点3编排：需求基线 → night-factory 工单（schema 完全兼容其 tasks/*.json）。
+    关键衔接：需求的量化验收标准 → 工单 acceptance[]（验证前置跨产品贯穿）。
+    """
+    storage = get_storage()
+    project = storage.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    from .integrations import generate_tickets
+
+    tickets = generate_tickets(project)
+    if not tickets:
+        return {
+            "success": True,
+            "tickets": [],
+            "message": "项目尚无需求基线：先触发调研分析生成需求（含量化验收标准），再转换为工单",
+        }
+    return {
+        "success": True,
+        "tickets": tickets,
+        "total": len(tickets),
+        "usage": "复制返回的 tickets 数组存为 night-factory 的 tasks/fde-tickets.json 即可夜间派发",
+    }
+
+
+@app.get("/api/v1/projects/{project_id}/delivery/tickets/export")
+async def export_delivery_tickets(project_id: str):
+    """导出 night-factory 兼容的工单 JSON 文件"""
+    storage = get_storage()
+    project = storage.get_project(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    from .integrations import export_tickets_json, generate_tickets
+
+    tickets = generate_tickets(project)
+    if not tickets:
+        raise HTTPException(status_code=400, detail="项目尚无需求基线，无法生成工单")
+    pid8 = project_id.replace("-", "")[:8]
+    return Response(
+        content=export_tickets_json(tickets),
+        media_type="application/json",
+        headers={"Content-Disposition": f'attachment; filename="fde-{pid8}-tickets.json"'},
+    )
+
+
+@app.post("/api/v1/projects/{project_id}/benchmarks/{benchmark_id}/rpa-dispatch")
+async def rpa_dispatch(project_id: str, benchmark_id: str):
+    """
+    卖点4编排：Benchmark 用例派发外部 RPA 执行（配置 RPA_WEBHOOK_URL 生效）。
+    未配置时返回 pending_integration（用例已就绪，接入即执行）。
+    """
+    storage = get_storage()
+    if storage.get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    benchmark = storage.get_benchmark(benchmark_id)
+    if benchmark is None:
+        raise HTTPException(status_code=404, detail="Benchmark不存在")
+    from .integrations import get_rpa_runner
+
+    runner = get_rpa_runner()
+    result = runner.dispatch(benchmark.get("test_cases", []))
+    return {"success": True, "dispatch": result, "runner_configured": runner.is_configured()}
 
 
 @app.get("/api/v1/projects/{project_id}/badcases")
