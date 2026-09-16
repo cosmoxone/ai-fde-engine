@@ -374,7 +374,8 @@ docker compose -f docker-compose.full.yml restart ai-fde-app
 - [模板贡献指南](docs/12-模板贡献指南.md) — 行业模板包贡献规范与质量红线
 - [公开评测基准](docs/benchmarks/baseline.md) — 种子集×评测器基线（可复现）
 - [真实LLM黄金集报告](docs/benchmarks/golden-real.md) — MiniMax-M2.7 命中率 100%（71/71）
-- [本体与知识库深化设计](docs/13-本体与知识库深化设计.md) — 卖点1+2 深化：v0.4.0 设计稿
+- [本体与知识库深化设计](docs/13-本体与知识库深化设计.md) — 卖点1+2 深化：v0.4.0 设计稿（知识库独立模块接入）
+- [知识库接口规格](docs/14-知识库接口规格.md) — KB Service API 契约（协作方对接用，P0/P1 分级）
 
 ## 版本说明
 
