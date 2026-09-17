@@ -1,6 +1,10 @@
 """
 知识库工具 - 基于LightRAG知识图谱RAG
 MVP阶段使用模拟，生产环境调用LightRAG + Qdrant
+
+⚠️ Deprecated（v0.4.0，2026-09-18）：v0.2 实验路径，当前无调用方，非主线。
+知识库主线为契约 14 号 v1.2 路线（src/knowledge/：Embedded FTS5 默认 / kb-os Remote
+可选；词法+人工审校，决策依据 docs/18 号 ADR）。保留供向量管线实验与向后兼容，勿在新代码引用。
 """
 
 from __future__ import annotations
