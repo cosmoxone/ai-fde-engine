@@ -93,6 +93,7 @@ class LLMClient:
             self._client = httpx.AsyncClient(
                 timeout=httpx.Timeout(120.0, connect=30.0),
                 limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+                trust_env=False,  # 规避代理环境变量毒化（同 knowledge 侧；21 号复盘 E1）
             )
         return self._client
 

@@ -13,7 +13,7 @@ from typing import Any, Optional
 
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -25,7 +25,10 @@ from .agents.training import TrainingAgent
 from .config import get_settings
 from .evaluation.evaluator import Evaluator
 from .exporter import build_deliverables, export_zip
+from .knowledge import KBContractError, get_knowledge_gateway
+from .knowledge.pipeline import auto_ingest, rebuild_project_kb
 from .memory import get_memory_manager
+from .ontology import get_ontology_gateway
 from .pipeline.iteration import NightlyIterationPipeline
 from .storage import get_storage
 from .templates import build_research_context, list_templates, match_template
@@ -117,7 +120,7 @@ async def _iteration_scheduler():
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.3.0",
+    version="0.4.0",
     description="AI驱动的FDE交付引擎 - 调研、设计、开发、迭代全流程AI化",
     lifespan=lifespan,
 )
@@ -358,7 +361,7 @@ async def health_check():
     """健康检查"""
     return {
         "status": "healthy",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "app_name": settings.app_name,
         "env": settings.app_env,
         "active_projects": len(get_storage().list_projects()),
@@ -451,6 +454,8 @@ async def upload_document(project_id: str, file: UploadFile = File(...)):
         "page_count": parse_result.get("page_count", 0),
         "uploaded_at": __import__("time").time(),
     }
+    # 自动入知识库（v0.4-a，契约 14 v1.2 文档级主协议；失败不阻断，状态记入 kb_status）
+    doc_record["kb_status"] = auto_ingest(project_id, doc_record)
     get_storage().add_document(project_id, doc_record)
 
     # 记录到记忆
@@ -468,6 +473,157 @@ async def list_documents(project_id: str):
     """文档列表"""
     docs = get_storage().list_documents(project_id)
     return {"success": True, "documents": docs, "total": len(docs)}
+
+
+# ===== 知识库 Dashboard 端点（v0.4-a，设计见 13 号 §3.4）=====
+
+
+def _hit_to_dict(hit) -> dict:
+    return {
+        "content": hit.content,
+        "source": {
+            "filename": hit.source.filename,
+            "chunk_index": hit.source.chunk_index,
+            "start_at": hit.source.start_at,
+            "end_at": hit.source.end_at,
+            "knowledge_id": hit.source.knowledge_id,
+        },
+        "score": round(hit.score, 4),
+        "entry_type": hit.entry_type,
+    }
+
+
+@app.get("/api/v1/projects/{project_id}/kb/stats")
+async def kb_stats(project_id: str):
+    """知识库统计（三元不变量观测面，规格 14 §3.6）"""
+    if get_storage().get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    s = get_knowledge_gateway().stats(project_id)
+    return {
+        "success": True,
+        "stats": {
+            "documents": s.documents,
+            "parsing": s.parsing,
+            "curated": s.curated,
+            "pending": s.pending,
+            "chunks": s.chunks,
+            "parse_failed": s.parse_failed,
+            "rejected": s.rejected,
+        },
+    }
+
+
+@app.post("/api/v1/projects/{project_id}/kb/ingest")
+async def kb_ingest(project_id: str):
+    """重建知识库：全量重推已解析文档（幂等按 doc_id 去重）"""
+    if get_storage().get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    docs = get_storage().list_documents(project_id)
+    result = rebuild_project_kb(project_id, docs)
+    return {"success": True, **result}
+
+
+@app.get("/api/v1/projects/{project_id}/kb/search")
+async def kb_search(project_id: str, q: str, k: int = 5):
+    """知识库检索（溯源五字段随命中返回）"""
+    if get_storage().get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    try:
+        hits = get_knowledge_gateway().search(project_id, q, top_k=k)
+    except KBContractError as exc:
+        raise HTTPException(status_code=exc.http_status or 400, detail={"code": exc.code, "message": exc.message})
+    return {"success": True, "hits": [_hit_to_dict(h) for h in hits]}
+
+
+@app.get("/api/v1/kb/entries")
+async def kb_pending_entries(project_id: str, status: str = "pending", page: int = 1, page_size: int = 50):
+    """待确认队列（Dashboard 审核工作台数据源；v0.4 仅 pending 态）"""
+    if status != "pending":
+        raise HTTPException(status_code=400, detail="v0.4 队列仅支持 status=pending")
+    total, entries = get_knowledge_gateway().list_pending(project_id, page, page_size)
+    return {"success": True, "total": total, "page": page, "page_size": page_size, "entries": entries}
+
+
+@app.post("/api/v1/kb/entries/{entry_id}/confirm")
+async def kb_confirm_entry(entry_id: str, project_id: str, body: dict | None = None):
+    """确认知识条目（可带人工编辑终稿；幂等，终态不可逆）"""
+    edited = None
+    if isinstance(body, dict) and (body.get("answer") or body.get("question_pattern")):
+        edited = body
+    try:
+        status = get_knowledge_gateway().confirm_entry(project_id, entry_id, edited=edited)
+    except KBContractError as exc:
+        raise HTTPException(status_code=exc.http_status or 400, detail={"code": exc.code, "message": exc.message})
+    return {"success": True, "entry_id": entry_id, "status": status}
+
+
+@app.post("/api/v1/kb/entries/{entry_id}/reject")
+async def kb_reject_entry(entry_id: str, project_id: str, body: dict | None = None):
+    """拒绝知识条目（保留记录可审计；幂等，终态不可逆）"""
+    try:
+        status = get_knowledge_gateway().reject_entry(project_id, entry_id, reason=(body or {}).get("reason"))
+    except KBContractError as exc:
+        raise HTTPException(status_code=exc.http_status or 400, detail={"code": exc.code, "message": exc.message})
+    return {"success": True, "entry_id": entry_id, "status": status}
+
+
+# ===== 本体（v0.4-b；契约 20 号；Remote/Embedded 同构）=====
+@app.post("/api/v1/projects/{project_id}/ontology/extract")
+async def ontology_extract(project_id: str, body: dict | None = None):
+    """增量本体抽取（任务化触发；已抽取文档按 doc_ref 跳过，force 可重抽——merge 幂等）"""
+    if get_storage().get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    body = body or {}
+    doc_ids = body.get("doc_ids")  # None = 全部已解析文档
+    force = bool(body.get("force", False))
+    docs = get_storage().list_documents(project_id)
+    from .ontology.service import extract_for_documents
+
+    result = await extract_for_documents(project_id, docs, doc_ids=doc_ids, force=force)
+    return {"success": True, **result}
+
+
+@app.get("/api/v1/projects/{project_id}/ontology")
+async def ontology_graph(project_id: str):
+    """本体图（Dashboard Mermaid 直染数据源）"""
+    if get_storage().get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    return {"success": True, **get_ontology_gateway().get_graph(project_id)}
+
+
+@app.get("/api/v1/projects/{project_id}/ontology/mermaid")
+async def ontology_mermaid(project_id: str):
+    if get_storage().get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    return PlainTextResponse(get_ontology_gateway().get_mermaid(project_id))
+
+
+@app.get("/api/v1/projects/{project_id}/ontology/summary")
+async def ontology_summary(project_id: str):
+    """本体压缩摘要（business_model_summary；v0.4-c 注入 research prompt）"""
+    if get_storage().get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    return {"success": True, "summary": get_ontology_gateway().get_summary(project_id)}
+
+
+@app.get("/api/v1/projects/{project_id}/ontology/entities")
+async def ontology_entities(project_id: str, q: str = "", limit: int = 50):
+    if get_storage().get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    items = get_ontology_gateway().find_entities(project_id, q, limit=limit)
+    return {"success": True, "total": len(items), "entities": items}
+
+
+@app.delete("/api/v1/projects/{project_id}/ontology/entities/{entity_id}")
+async def ontology_delete_entity(project_id: str, entity_id: str):
+    """人工删除实体（软删，Dashboard 幻觉实体处置；后续抽取不复活）"""
+    if get_storage().get_project(project_id) is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    if not get_ontology_gateway().delete_entity(project_id, entity_id):
+        raise HTTPException(
+            status_code=404, detail={"code": "not_found", "message": f"实体不存在或已删除: {entity_id}"}
+        )
+    return {"success": True, "deleted": True, "id": entity_id}
 
 
 # ===== 调研分析 =====

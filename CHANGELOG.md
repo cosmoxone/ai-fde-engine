@@ -3,6 +3,70 @@
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.4.0] - 2026-09-17 知识与本体（v0.4-a 契约接入 × v0.4-b 本体抽取 × v0.4-c Research RAG 化）
+
+> **发布概要**：测试 488→549 全绿（含契约套件 13 用例）；契约 14 号 v1.2 定版并双实现（Embedded × kb-os 真机）对拍一致；
+> 新增 `src/knowledge/`（8 模块）与 `src/ontology/`（7 模块，含对外独立服务契约 20 号 v0.1-draft）；
+> Dashboard 新增知识库 + 本体图谱两页面；文档组扩展至 13~21 号（含 RAG 技术立场 ADR 与两日冲刺过程复盘）。
+
+### v0.4-c — Research RAG 化与迭代闭环
+
+#### Added — research RAG 化（设计 13 号 §3.3 机制 2/4；决策依据 18 号）
+
+- **三模式输入组装** `research_rag_mode`（config，默认 `hybrid`）：`full` 现状全文截断（基线）/ `hybrid` 知识库检索块+本体摘要+每文档压缩摘要 / `rag` 纯检索+文档清单——修掉 `content[:30000]` 静默截断（约 97% 内容丢弃）
+- **适用边界代码化**（18 号 §6）：KB 无命中自动回退 full（`full-fallback`），检索/本体异常不阻断
+- **`input_stats` 成本观测**：mode_effective/kb_hits/ontology_injected/prompt_chars/full_chars/reduction——RAG vs 全文对比数据（发布时进 golden-real 两栏报告）
+- **本体注入**：`business_model_summary` 进 research prompt（13 号机制 1×2 枢纽）
+- **badcase→CuratedEntry 闭环**（机制 4）：knowledge 归因修复 → 草稿进 pending 审核队列（origin=badcase-loop，幂等；人工确认门，不直接污染知识库；KB 故障不阻断）
+- **Embedded 检索质量修复**：查询整串 phrase 匹配对自然语言长句命中率极低 → 三级降级（整串 phrase → 分片 OR → LIKE 兜底）——RAG 消费场景的必要修复，契约语义不变
+- **黄金集两栏终验 PASS**（deepseek-chat，2026-09-17）：hybrid 98.59%（70/71）≥ full 97.18%（69/71）——18 号 ADR 结论生效，RAG 化默认维持；hybrid 栏评估器内置"先 ingest 再检索"（否则空检索回退 full、两栏失真）
+- **机制 3 Benchmark 溯源**：hybrid/rag 模式下 `test_case.source={filename, chunk_index}` 注入（合同级验收标准可追溯；full 留空兼容）
+- 修复：`src/llm/client.py` httpx 补 `trust_env=False`（本机 socks 代理环境变量毒化 LLM 调用，静默回退 mock——21 号复盘 E1 同源问题再犯，已修）
+
+#### Changed
+
+- `research.run()` 输出 metadata 增 `input_stats`；测试 545 passed（+6：三模式/回退/本体注入/闭环幂等/KB 故障隔离）
+
+### v0.4-b — 本体抽取与对外服务
+
+#### Added — 本体模块 `src/ontology/`（~1000 行；设计 13 号 §3.2，对外契约 20 号 v0.1-draft）
+
+- **数据与存储**：`types.py`（Entity/Relation/Rule/MergeReport，稳定哈希 id 幂等）+ `store.py`（SQLite 增量 merge：同名实体属性合并、source_docs 追加去重、**图规模不重复增长**；孤儿关系过滤；**软删不复活**——人工删除权威，13 号风险表）
+- **抽取管线**：`extractor.py` LLM 结构化抽取（chat_json + required_keys 校验重试）+ Mock 行业模板派生（制造业模板 24 实体/18 关系/4 规则 + 文档标题派生项目实体；无 Key 流程可跑通）
+- **三态 Gateway**（镜像知识库接入层）：Embedded（默认）/ Remote（`ONTOLOGY_SERVICE_URL` 即启用）/ Fallback（远端故障降级 Embedded 标记 degraded_since；契约错误不降级）
+- **对外独立服务**：`server.py`（六端点 `/extract /graph /mermaid /summary /entities /hints` + 软删 DELETE；`ONTOLOGY_SERVICE_TOKEN` 可选鉴权；`X-Onto-Project` 项目上下文；错误统一 `{"error":{code,message}}`）——**独立组件融合入口**：`POST /hints` 供前期处理组件生成 entity_hints
+- **引擎接线**：`POST /api/v1/projects/{id}/ontology/extract`（任务化增量，doc_ref 记账跳过已抽取，force 重抽幂等）+ 图/Mermaid/摘要/实体检索/人工删除 6 端点；`entity_hints` 预标注回填 `knowledge/pipeline`（本体不可用回退空，不违契约 14 号"存而不滤"）
+- 测试 539 passed（+19：merge 幂等/增量验收/软删/网关三态/独立服务/引擎 API/hints 回填闭环）
+
+### v0.4-a — 知识库契约与接入层（契约 14 号 v1.2 [W0 转正] × kb-os 联合方案；W3 真机对拍 13/13）
+
+#### Added — 知识库独立模块接入（契约 14 号 v1.2 [W0 转正] × kb-os 联合方案）
+
+**契约协作**（双方共识存档：`docs/15-对接方案评审回复.md` × kb-os《09-ai-fde对接方案》v1.1 §七）：
+- 14 号规格三轮升版（v1.0→v1.1→v1.2，2026-09-17 W0 会议确认转正正式版）：文档级推送主协议（幂等按 doc_id）、Scoped API Key 即项目身份（请求体去 project_id）、页码分页、就绪信号文档级 `parsing`（三元不变量 `documents+parsing+parse_failed=累计接受`）、错误码表定版（稳定字符串码 + kb-os 数字码映射 + `error_key` 双轨）、溯源五字段必填、附录 A chunk 降级模式
+- 三决策定版：文档级推送 / scoped key 隔离 / 走法 A（KbOsGateway 薄适配器，~1 人日）
+- 契约测试套件 `tests/contract/`：场景内核 + spec14/kb-os 双断言适配（13 用例，集成性质，需 `KB_BASE_URL`）；对参考服务实测 12 过 1 跳（鉴权负例）
+- **W3 真机对拍 13/13 通过**（2026-09-17，kb-os 联调实例 8011 × WeKnora 引擎 × scoped key）：合入 kb-os 预演报告（[17 号](docs/17-W3对拍预演报告-kb-os.md)）定位的 stats 用例跨测试隔离修复（`before=wait(kb)`，异步索引实现必需），双实现零回归；对拍回执 [19 号](docs/19-W3对拍结果回执-ai-fde.md)
+- 技术立场存档 `docs/18-RAG化技术立场-v0.4-c决策依据.md`：v0.4-c RAG 化决策依据（RAG-less 趋势辨析、检索不可替代的四场景、黄金集止损线与适用边界规则）
+
+**代码落地 `src/knowledge/`**（~1100 行）：
+- `types.py` 契约类型与错误体系（KBContractError 4xx 不降级 / KnowledgeGatewayError 触发降级）
+- `chunker.py` 标题感知切块器（title_path 滚动、字符偏移溯源、超长句读二次切分）
+- `embedded.py` EmbeddedKnowledgeGateway：SQLite FTS5 trigram 参考实现（「参考实现即规格」；文档级 ingest + 附录 A 降级 + curate 生命周期 + BM25 归一化 + curated 加权）
+- `kbos.py` KbOsGateway：kb-os 原生 API 适配（Envelope 解包、error_key 优先、50002→降级语义）
+- `gateway.py` 工厂（`KNOWLEDGE_SERVICE_URL` 热切换）+ FallbackKnowledgeGateway（Remote 不可用自动降级 Embedded 并标记）
+- `server.py` spec14 HTTP 参考服务（全端点 + 鉴权 + 错误分支；`uvicorn src.knowledge.server:app`）
+- `pipeline.py` 上传自动 ingest（失败不阻断，`kb_status` 记入文档记录）+ 项目级重建
+
+**引擎接线**：
+- 上传文档自动入知识库（文档级主协议）；Dashboard 端点：`GET /projects/{id}/kb/stats|search`、`POST /projects/{id}/kb/ingest`（重建）、`GET /kb/entries`（待确认队列）、`POST /kb/entries/{id}/confirm|reject`
+- `config` 新增 `knowledge_service_url / knowledge_service_token / knowledge_db_path`
+
+#### Changed
+
+- 测试 488 → **520 passed**（+32 知识库单测/API 测试全绿；契约 13 条集成态按守卫跳过）
+- 13 号设计文档摘要与 14 号 v1.2 对齐；09 号 roadmap 落 v0.4-a 范围与 kb-os 协作排期（W1~W3）
+
 ## [0.3.0] - 2026-09-08
 
 ### Added — 四大卖点定位（生态集成版）

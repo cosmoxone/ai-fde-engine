@@ -97,16 +97,19 @@ pre { background: #0f1117; border: 1px solid #252836; border-radius: 6px; paddin
   .cards { grid-template-columns: 1fr 1fr; }
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" onerror="window.mermaid=null"></script>
 </head>
 <body>
 
 <div class="sidebar">
-  <div class="logo">AI-FDE Engine<span>v0.3.0 · 交付控制台</span></div>
+  <div class="logo">AI-FDE Engine<span>v0.4.0 · 交付控制台</span></div>
   <div class="nav-item active" data-page="overview"><span class="icon">📊</span><span>总览</span></div>
   <div class="nav-item" data-page="projects"><span class="icon">📁</span><span>项目管理</span></div>
   <div class="nav-item" data-page="tasks"><span class="icon">⚡</span><span>任务监控</span></div>
   <div class="nav-item" data-page="quality"><span class="icon">✅</span><span>质量中心</span></div>
   <div class="nav-item" data-page="review"><span class="icon">🔍</span><span>审核工作台</span></div>
+  <div class="nav-item" data-page="knowledge"><span class="icon">📚</span><span>知识库</span></div>
+  <div class="nav-item" data-page="ontology"><span class="icon">🕸️</span><span>本体图谱</span></div>
   <div class="nav-item" data-page="selfservice"><span class="icon">🤝</span><span>自助交付</span></div>
   <div class="nav-item" data-page="memoryhub"><span class="icon">🧠</span><span>经验库</span></div>
   <div class="nav-item" data-page="api"><span class="icon">🔌</span><span>API文档</span></div>
@@ -226,6 +229,58 @@ pre { background: #0f1117; border: 1px solid #252836; border-radius: 6px; paddin
     <div class="panel">
       <div class="panel-title">客户项目进度</div>
       <div id="ss-projects"></div>
+    </div>
+  </div>
+
+  <!-- 知识库（v0.4-a：契约 14 号消费面） -->
+  <div class="page" id="page-knowledge">
+    <div class="page-header">
+      <div><h1>知识库</h1><div class="subtitle">文档检索（溯源五字段）× 知识条目审核队列（curate 生命周期）</div></div>
+      <span class="refresh-btn" onclick="loadKnowledge()">🔄 刷新</span>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;">
+      <select id="kb-project" onchange="loadKnowledge()" style="padding:8px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;"></select>
+      <button class="btn btn-primary btn-sm" onclick="kbRebuild()">重建索引</button>
+    </div>
+    <div class="cards" id="kb-stats-cards"></div>
+    <div class="panel">
+      <div class="panel-title">语义检索（q + top-k，命中含出处）</div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <input id="kb-query" placeholder="输入检索词，如：特采放行流程" style="flex:1;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;" onkeydown="if(event.key==='Enter')kbSearch()">
+        <input id="kb-topk" type="number" value="5" min="1" max="20" style="width:70px;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;">
+        <button class="btn btn-primary" onclick="kbSearch()">检索</button>
+      </div>
+      <div id="kb-search-results"><div class="empty-state"><div class="icon">🔍</div>输入关键词检索项目知识</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">待确认知识条目（badcase 闭环 / 人工 curate → confirm 后加权生效）</div>
+      <div id="kb-pending-queue"><div class="empty-state">选择项目后加载</div></div>
+    </div>
+  </div>
+
+  <!-- 本体图谱（v0.4-b：契约 20 号消费面） -->
+  <div class="page" id="page-ontology">
+    <div class="page-header">
+      <div><h1>本体图谱</h1><div class="subtitle">业务实体/关系/规则——增量抽取（幂等 merge）× 人工删除（软删不复活）</div></div>
+      <span class="refresh-btn" onclick="loadOntology()">🔄 刷新</span>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;">
+      <select id="onto-project" onchange="loadOntology()" style="padding:8px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;"></select>
+      <button class="btn btn-primary btn-sm" onclick="ontoExtract(false)">增量抽取</button>
+      <button class="btn btn-sm" onclick="ontoExtract(true)" style="background:#1c1f2e;color:#e0e0e0;border:1px solid #252836;">强制重抽</button>
+    </div>
+    <div class="cards" id="onto-stats-cards"></div>
+    <div class="panel">
+      <div class="panel-title">业务关系图（Mermaid）</div>
+      <div id="onto-mermaid" style="overflow:auto;background:#0d0f15;border-radius:8px;padding:12px;min-height:200px;"><div class="empty-state">抽取后渲染</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">实体管理（幻觉实体可人工删除）</div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;">
+        <input id="onto-entity-q" placeholder="按名称/类型搜索实体" style="flex:1;padding:10px;background:#0f1117;border:1px solid #252836;border-radius:6px;color:#e0e0e0;" onkeydown="if(event.key==='Enter')ontoSearch()">
+        <button class="btn btn-primary" onclick="ontoSearch()">搜索</button>
+      </div>
+      <div id="onto-entity-list"><div class="empty-state">搜索或抽取后显示</div></div>
     </div>
   </div>
 
@@ -577,6 +632,8 @@ document.querySelectorAll('.nav-item').forEach(item => {
     if (item.dataset.page === 'tasks') loadTasks();
     if (item.dataset.page === 'quality') loadQuality();
     if (item.dataset.page === 'review') loadReviewQueue();
+    if (item.dataset.page === 'knowledge') loadKnowledge();
+    if (item.dataset.page === 'ontology') loadOntology();
     if (item.dataset.page === 'selfservice') loadSelfService();
   });
 });
@@ -965,6 +1022,156 @@ loadOverview();
 checkLLMStatus();
 // 每30秒自动刷新总览
 setInterval(() => { if (document.getElementById('page-overview').classList.contains('active')) loadOverview(); }, 30000);
+
+// ===== 知识库（v0.4-a）=====
+async function fillProjectSelect(selId) {
+  const sel = document.getElementById(selId);
+  const data = await api('/projects');
+  const prev = sel.value;
+  sel.innerHTML = (data.projects || []).map(p => `<option value="${p.id}">${p.name}</option>`).join('') || '<option value="">（先创建项目）</option>';
+  if (prev) sel.value = prev;
+  return sel.value;
+}
+
+async function loadKnowledge() {
+  const pid = await fillProjectSelect('kb-project');
+  if (!pid) return;
+  const s = await api(`/projects/${pid}/kb/stats`);
+  const st = s.stats || {};
+  document.getElementById('kb-stats-cards').innerHTML = `
+    <div class="card"><div class="label">文档</div><div class="value">${st.documents ?? 0}</div><div class="trend">在途 ${st.parsing ?? 0}</div></div>
+    <div class="card"><div class="label">已确认条目</div><div class="value">${st.curated ?? 0}</div><div class="trend">加权 ×1.05</div></div>
+    <div class="card"><div class="label">待确认</div><div class="value">${st.pending ?? 0}</div><div class="trend">下方审核</div></div>
+    <div class="card"><div class="label">解析失败</div><div class="value">${st.parse_failed ?? 0}</div><div class="trend">不计 parsing</div></div>`;
+  await loadKbPending();
+}
+
+async function loadKbPending() {
+  const pid = document.getElementById('kb-project').value;
+  const box = document.getElementById('kb-pending-queue');
+  if (!pid) { box.innerHTML = '<div class="empty-state">（先创建项目）</div>'; return; }
+  const data = await api(`/kb/entries?project_id=${pid}&status=pending&page=1&page_size=50`);
+  const entries = data.entries || [];
+  if (!entries.length) { box.innerHTML = '<div class="empty-state">队列为空——badcase 闭环或人工 curate 会进入这里</div>'; return; }
+  box.innerHTML = entries.map(e => `
+    <div style="border:1px solid #252836;border-radius:8px;padding:12px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <b style="color:#e0e0e0;">${e.draft?.question_pattern || '(无问题模式)'}</b>
+        <span style="font-size:12px;color:#888;">${e.draft?.origin || ''}</span>
+      </div>
+      <div style="color:#aaa;font-size:13px;white-space:pre-wrap;max-height:120px;overflow:auto;">${(e.draft?.answer || '').slice(0, 500)}</div>
+      <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end;">
+        <button class="btn btn-sm" style="background:#ef4444;color:#fff;border:none;" onclick="kbReject('${e.entry_id}')">拒绝</button>
+        <button class="btn btn-primary btn-sm" onclick="kbConfirm('${e.entry_id}')">确认生效</button>
+      </div>
+    </div>`).join('');
+}
+
+async function kbConfirm(entryId) {
+  const pid = document.getElementById('kb-project').value;
+  const r = await api(`/kb/entries/${entryId}/confirm?project_id=${pid}`, { method: 'POST' });
+  if (r.success !== false) { await loadKbPending(); await loadKnowledge(); } else alert(r.detail?.message || r.error || '确认失败');
+}
+
+async function kbReject(entryId) {
+  const pid = document.getElementById('kb-project').value;
+  const r = await api(`/kb/entries/${entryId}/reject?project_id=${pid}`, { method: 'POST', body: JSON.stringify({ reason: 'dashboard-reject' }) });
+  if (r.success !== false) { await loadKbPending(); } else alert(r.detail?.message || r.error || '拒绝失败');
+}
+
+async function kbSearch() {
+  const pid = document.getElementById('kb-project').value;
+  const q = document.getElementById('kb-query').value.trim();
+  const k = document.getElementById('kb-topk').value || 5;
+  const box = document.getElementById('kb-search-results');
+  if (!q || !pid) { box.innerHTML = '<div class="empty-state">请输入检索词</div>'; return; }
+  const data = await api(`/projects/${pid}/kb/search?q=${encodeURIComponent(q)}&k=${k}`);
+  const hits = data.hits || [];
+  if (!hits.length) { box.innerHTML = '<div class="empty-state">无命中（空结果也是契约行为：精确口径）</div>'; return; }
+  box.innerHTML = hits.map(h => `
+    <div style="border:1px solid #252836;border-radius:8px;padding:12px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span style="color:#6c8cff;font-size:12px;">📄 ${h.source?.filename || '?'} · 片段${h.source?.chunk_index ?? '?'} · [${h.source?.start_at ?? '?'}~${h.source?.end_at ?? '?'}]</span>
+        <span style="font-size:12px;color:#888;">${h.entry_type} · ${h.score.toFixed(2)}</span>
+      </div>
+      <div style="color:#ccc;font-size:13px;">${h.content.slice(0, 300)}</div>
+    </div>`).join('');
+}
+
+async function kbRebuild() {
+  const pid = document.getElementById('kb-project').value;
+  if (!pid) return;
+  if (!confirm('重建索引：全量重推已解析文档（幂等）？')) return;
+  const r = await api(`/projects/${pid}/kb/ingest`, { method: 'POST' });
+  alert(r.success !== false ? `重建完成：接受 ${r.accepted ?? 0}，去重 ${r.deduped ?? 0}` : '重建失败');
+  await loadKnowledge();
+}
+
+// ===== 本体图谱（v0.4-b）=====
+async function loadOntology() {
+  const pid = await fillProjectSelect('onto-project');
+  if (!pid) return;
+  const g = await api(`/projects/${pid}/ontology`);
+  const stats = g.stats || {};
+  document.getElementById('onto-stats-cards').innerHTML = `
+    <div class="card"><div class="label">实体</div><div class="value">${stats.entities ?? 0}</div></div>
+    <div class="card"><div class="label">关系</div><div class="value">${stats.relations ?? 0}</div></div>
+    <div class="card"><div class="label">规则</div><div class="value">${stats.rules ?? 0}</div></div>
+    <div class="card"><div class="label">已抽取文档</div><div class="value">${stats.extracted_docs ?? 0}</div></div>`;
+  await renderOntoMermaid(pid);
+}
+
+async function renderOntoMermaid(pid) {
+  const box = document.getElementById('onto-mermaid');
+  try {
+    const res = await fetch(`${API}/projects/${pid}/ontology/mermaid`);
+    const text = await res.text();
+    if (!text.trim().startsWith('graph')) { box.innerHTML = '<div class="empty-state">先执行抽取</div>'; return; }
+    if (window.mermaid) {
+      mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+      const { svg } = await mermaid.render('onto-svg-' + Date.now(), text);
+      box.innerHTML = svg;
+    } else {
+      box.innerHTML = `<pre style="color:#9aa;font-size:12px;white-space:pre;">${text.replace(/</g, '&lt;')}</pre><div style="color:#666;font-size:12px;">（离线模式：显示 Mermaid 源码，联网后自动渲染图形）</div>`;
+    }
+  } catch (e) { box.innerHTML = `<div class="empty-state">渲染失败：${e.message}</div>`; }
+}
+
+async function ontoExtract(force) {
+  const pid = document.getElementById('onto-project').value;
+  if (!pid) return;
+  if (force && !confirm('强制重抽全部文档？（merge 幂等，图规模不重复增长）')) return;
+  const r = await api(`/projects/${pid}/ontology/extract`, { method: 'POST', body: JSON.stringify({ force: !!force }) });
+  const totals = r.totals || {};
+  alert(r.success !== false
+    ? `抽取 ${r.extracted} 篇（跳过已抽取 ${r.skipped_already_extracted}）\n新增实体 ${totals.entities_added ?? 0} / 关系 ${totals.relations_added ?? 0}`
+    : '抽取失败');
+  await loadOntology();
+}
+
+async function ontoSearch() {
+  const pid = document.getElementById('onto-project').value;
+  const q = document.getElementById('onto-entity-q').value.trim();
+  const box = document.getElementById('onto-entity-list');
+  if (!pid) return;
+  const data = await api(`/projects/${pid}/ontology/entities?q=${encodeURIComponent(q)}&limit=50`);
+  const ents = data.entities || [];
+  if (!ents.length) { box.innerHTML = '<div class="empty-state">无匹配实体</div>'; return; }
+  box.innerHTML = ents.map(e => `
+    <div style="display:flex;justify-content:space-between;align-items:center;border:1px solid #252836;border-radius:8px;padding:10px;margin-bottom:8px;">
+      <div><b style="color:#e0e0e0;">${e.name}</b> <span style="color:#6c8cff;font-size:12px;">${e.type}</span>
+        <div style="color:#777;font-size:11px;">置信度 ${e.confidence} · 来源 ${(e.source_docs || []).join(', ')}</div></div>
+      <button class="btn btn-sm" style="background:#ef4444;color:#fff;border:none;" onclick="ontoDeleteEntity('${e.id}')">删除</button>
+    </div>`).join('');
+}
+
+async function ontoDeleteEntity(id) {
+  const pid = document.getElementById('onto-project').value;
+  if (!confirm('软删该实体？（后续抽取不复活）')) return;
+  const r = await api(`/projects/${pid}/ontology/entities/${id}`, { method: 'DELETE' });
+  if (r.success !== false) { await ontoSearch(); await loadOntology(); } else alert('删除失败');
+}
+
 // 响应式
 window.addEventListener('resize', () => { Object.values(charts).forEach(c => c.resize()); });
 </script>

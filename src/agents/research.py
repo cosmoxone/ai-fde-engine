@@ -60,17 +60,32 @@ class ResearchAgent(BaseAgent):
         memory_context = input_data.get("_memory_context", "")
         industry_context = input_data.get("industry_context", "")  # v0.1.2 B2 行业模板注入
 
-        # 1. 整合所有输入信息
-        all_content = self._aggregate_inputs(
+        # 1. 整合所有输入信息（v0.4-c：三模式组装——full 现状 / hybrid 检索+文档摘要（默认）/ rag 纯检索）
+        full_content = self._aggregate_inputs(
             documents, client_requirements, interview_notes, memory_context, industry_context
+        )
+        content, input_stats, rag_sources = self._compose_context(
+            documents,
+            client_requirements,
+            interview_notes,
+            memory_context,
+            industry_context,
+            full_content,
         )
 
         # 2. 四任务并行分析（在实际LLM调用中通过结构化Prompt并行处理）
         #    这里使用模拟/真实LLM调用的统一接口
-        analysis_result = await self._perform_analysis(all_content)
+        analysis_result = await self._perform_analysis(content)
 
         # 3. 结构化输出
         structured = self._structure_output(analysis_result)
+
+        # 3.5 v0.4-c 机制3（13 号 §3.3）：Benchmark 溯源——用例携带语料出处
+        # （合同级"验收标准可追溯"）；RAG/混合模式且有检索命中时注入，full 模式留空兼容。
+        test_cases = ((structured.get("benchmark") or {}).get("test_cases")) or []
+        for i, case in enumerate(test_cases):
+            if rag_sources and i < len(rag_sources):
+                case["source"] = rag_sources[i % len(rag_sources)]
 
         return AgentResult(
             success=True,
@@ -81,8 +96,134 @@ class ResearchAgent(BaseAgent):
                 "requirement_count": len(structured.get("requirements", [])),
                 "benchmark_case_count": len(structured.get("benchmark", {}).get("test_cases", [])),
                 "process_node_count": len(structured.get("business_process", {}).get("nodes", [])),
+                "input_stats": input_stats,  # v0.4-c：模式/命中/成本对比（13 号验收"RAG token 成本对比数据"）
             },
         )
+
+    def _compose_context(
+        self,
+        documents: list[dict],
+        client_requirements: str,
+        interview_notes: str,
+        memory_context: str,
+        industry_context: str,
+        full_content: str,
+    ) -> tuple[str, dict, list[dict]]:
+        """v0.4-c RAG 化（设计 13 号 §3.3 机制2；决策依据 18 号）。
+        返回 (content, input_stats, rag_sources)——rag_sources 为命中块出处
+        （filename/chunk_index），供机制3 Benchmark 溯源注入。
+
+        三模式（settings.research_rag_mode）：
+        - full：现状全文截断（每文档 [:8000]、总 [:30000]）——基线与回退形态；
+        - hybrid（默认）：知识库检索块 + 本体摘要 + 每文档压缩摘要（[:800]）；
+        - rag：检索块 + 本体摘要 + 文档清单（全文不进 prompt）。
+
+        适用边界（18 号 §6）：KB 无命中 → 自动回退 full（小语料直接塞）；
+        检索/本体任何异常不阻断（回退 full），fallback 原因记入 input_stats。
+        """
+        mode = (getattr(self.settings, "research_rag_mode", "full") or "full").strip().lower()
+        stats = {
+            "mode_requested": mode,
+            "mode_effective": "full",
+            "full_chars": len(full_content),
+            "prompt_chars": len(full_content),
+            "kb_hits": 0,
+            "ontology_injected": False,
+            "reduction": 0.0,
+        }
+        if mode == "full":
+            return full_content, stats, []
+
+        rag = self._build_rag_context(documents, client_requirements)
+        if not rag["blocks"]:
+            stats.update(mode_effective="full-fallback", fallback_reason="no-kb-hits")
+            return full_content, stats, []
+
+        extras = []
+        if industry_context:
+            extras.append(industry_context)
+        if memory_context:
+            extras.append(f"=== 历史项目经验参考 ===\n{memory_context}\n")
+        if client_requirements:
+            extras.append(f"=== 客户原始诉求 ===\n{client_requirements}\n")
+        if interview_notes:
+            extras.append(f"=== 访谈纪要 ===\n{interview_notes}\n")
+
+        body = []
+        if rag["ontology_summary"]:
+            body.append(f"=== 业务本体摘要 ===\n{rag['ontology_summary']}\n")
+        body.append("=== 知识库检索片段（按相关度，含出处） ===")
+        for b in rag["blocks"]:
+            body.append(f"[{b['filename']} 片段{b['chunk_index']}] {b['content']}")
+        if mode == "rag":
+            names = "、".join(
+                (d.get("filename", f"文档{i}") if isinstance(d, dict) else f"文档{i}")
+                for i, d in enumerate(documents, 1)
+            )
+            body.append(f"=== 文档清单（全文未注入） ===\n{names}")
+        else:  # hybrid：检索 + 每文档压缩摘要
+            body.append("=== 文档摘要（全文压缩） ===")
+            for i, d in enumerate(documents, 1):
+                c = d.get("content", "") if isinstance(d, dict) else str(d)
+                t = d.get("filename", f"文档{i}") if isinstance(d, dict) else f"文档{i}"
+                body.append(f"--- {t} ---\n{c[:800]}")
+
+        content = "\n".join(extras + body)
+        stats.update(
+            kb_hits=len(rag["blocks"]),
+            ontology_injected=bool(rag["ontology_summary"]),
+            prompt_chars=len(content),
+            mode_effective=mode,
+            reduction=round(1 - len(content) / max(len(full_content), 1), 3),
+        )
+        sources = [{"filename": b["filename"], "chunk_index": b["chunk_index"]} for b in rag["blocks"]]
+        return content, stats, sources
+
+    def _build_rag_context(self, documents: list, client_requirements: str) -> dict:
+        """知识库检索（Gateway search，查询=诉求+文档标题）+ 本体摘要；异常一律回空（不阻断）。"""
+        queries: list[str] = []
+        if client_requirements and client_requirements.strip():
+            queries.append(client_requirements.strip()[:120])
+        for d in documents[:5]:
+            title = d.get("filename") if isinstance(d, dict) else None
+            if title:
+                queries.append(str(title))
+            body_head = (d.get("content", "") if isinstance(d, dict) else str(d)).strip()[:60]
+            if body_head:  # 内容首段通常含主题词——FTS 对自然语言长句/文件名命中率低
+                queries.append(body_head)
+        blocks, seen = [], set()
+        try:
+            from ..knowledge import get_knowledge_gateway  # noqa: PLC0415 —— 模块分离，延迟绑定
+
+            gw = get_knowledge_gateway()
+            for q in queries[:8]:
+                for hit in gw.search(self.project_id, q, top_k=5):
+                    key = (hit.source.knowledge_id, hit.source.chunk_index)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    blocks.append(
+                        {
+                            "filename": hit.source.filename or "(未知文档)",
+                            "chunk_index": hit.source.chunk_index or 0,
+                            "content": hit.content[:600],
+                        }
+                    )
+                if len(blocks) >= 20:
+                    break
+        except Exception as exc:  # noqa: BLE001 —— 知识库不可用：视为无命中回退 full
+            return {"blocks": [], "ontology_summary": "", "error": type(exc).__name__}
+
+        ontology_summary = ""
+        try:
+            from ..ontology import get_ontology_gateway  # noqa: PLC0415
+
+            summary = get_ontology_gateway().get_summary(self.project_id)
+            if summary and "本体为空" not in summary:
+                ontology_summary = summary
+        except Exception:  # noqa: BLE001 —— 本体不可用：跳过注入
+            pass
+        return {"blocks": blocks, "ontology_summary": ontology_summary}
 
     def _aggregate_inputs(
         self,

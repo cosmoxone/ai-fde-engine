@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-fde-engine"
-version = "0.3.0"
+version = "0.4.0"
 description = "AI驱动的FDE交付引擎 - 调研、设计、开发、迭代全流程AI化"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -72,6 +72,8 @@ markers = [
     "slow: 慢速测试（可用 -m 'not slow' 跳过）",
     "performance: 性能测试（验证性能指标）",
     "security: 安全测试（脱敏/注入/越权）",
+    "p0: 知识库契约 P0（联调最小集：上传→建库→检索闭环，tests/contract）",
+    "p1: 知识库契约 P1（审核交互闭环：curate→pending→confirm/reject，tests/contract）",
     "customer: 自助型客户场景测试（F7）",
     "fde: FDE工程师场景测试",
     "ops: 系统管理员/运维场景测试",

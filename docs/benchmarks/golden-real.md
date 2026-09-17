@@ -53,3 +53,44 @@ python -m src.evaluation.golden    # 输出命中率报告
 ---
 
 *发布门槛原则（docs/09 §决策）：真实命中率 ≥80% 方可对外宣传质量主张。本报告结果：达标。*
+
+
+---
+
+## v0.4 RAG 化两栏对比（协议就绪，待执行）
+
+> 状态：**机制已交付（2026-09-17），待 LLM API Key 配置后执行**——18 号 ADR 的终验数据（结论以本表为准）。
+
+### 执行协议
+
+```bash
+# 配置任一 Key 后：
+python -c "import asyncio; from src.evaluation.golden import run_golden_rag_compare as r; \
+  import json; print(json.dumps(asyncio.run(r()), ensure_ascii=False, indent=2))"
+# 或单栏：run_golden_eval(rag_mode='full' | 'hybrid')
+```
+
+- 样本：同黄金集 20 条（制造业 8 / 金融 6 / 政务 6，71 要点），双跑 full × hybrid
+- 成本口径：input_stats 聚合（avg_prompt_chars / avg_full_chars / avg_reduction）
+- **判据**：hybrid 栏 hit_rate ≥ full 栏（≥100% 不倒退）→ RAG 化默认维持；倒退 → 按 18 号 §6 预案回退 `research_rag_mode=full` 并在本文补记
+
+### 结果（2026-09-17 21:35 执行，deepseek-chat / deepseek-flash）
+
+| 栏 | 命中率 | 未中要点 | avg_prompt_chars | avg_full_chars | reduction | 用时 |
+| --- | --- | --- | --- | --- | --- | --- |
+| full（基线） | 69/71 = **97.18%** | 2 | 468 | 468 | 0 | 195s |
+| hybrid（默认） | 70/71 = **98.59%** | 1 | 666 | 565 | -0.181* | 193s |
+| **结论** | **hybrid ≥ full → PASS，RAG 化默认模式维持** | | | | | |
+
+**\*成本维度的如实披露**：黄金集样本均为小语料（avg full ~565 字符），hybrid 组装（检索块+文档摘要+结构提示）
+略大于纯全文（reduction -0.181 ≈ 100 字符/条）——符合 18 号 ADR 边界规则 2 预期（小语料本应直接塞，
+RAG 无成本优势但也无实质劣势）；大语料场景的压缩优势已由单测验证（3.5 万字样本 reduction > 0.5，
+`tests/test_rag_research.py::test_rag_pure_mode`）。**质量维度**：hybrid 多命中 1 条要点（检索块聚焦+出处
+结构化抵消了摘要压缩的信息损失），两栏均未回退 mock（真实 LLM 输出 40/40）。
+
+**执行环境**：DEEPSEEK_API_KEY + MODEL_TASK_RESEARCH=deepseek-chat（模型路由默认 qwen3.6-27b 需显式覆盖）
++ 临时 KB 库（KNOWLEDGE_DB_PATH=/tmp）；hybrid 栏每样本独立项目先 ingest 再检索（评估器内置，两栏对比前提）。
+
+**过程排障（如实记录）**：首跑两栏均 0.1s 完成、命中率 47.89%——模型路由指 qwen（无 key 静默回退 mock）
++ LLM client 的 httpx 未设 trust_env=False（本机 socks 代理环境变量毒化，与知识库侧同源问题，21 号复盘 E1
+再犯）——修复后重跑得上表真实数据。

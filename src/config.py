@@ -37,6 +37,16 @@ class Settings(BaseSettings):
     storage_provider: Literal["memory", "sqlite"] = "sqlite"
     data_dir: str = "data"
 
+    # ===== 知识库网关（v0.4-a，契约 14 号 v1.2）=====
+    knowledge_service_url: str = ""  # 配置即启用 kb-os Remote（走法 A）；空 = Embedded 默认
+    knowledge_service_token: str = ""  # 项目 scoped key（Bearer；kb-os 发放）
+    knowledge_db_path: str = ""  # Embedded SQLite 路径；缺省 {data_dir}/knowledge.db
+    # ===== 本体模块 v0.4-b（契约 20 号；Remote/Embedded 同构）=====
+    ontology_service_url: str = ""  # 本体独立服务 Remote（契约 20 号）；空 = Embedded 默认
+    ontology_service_token: str = ""  # 独立服务 Bearer token（ONTOLOGY_SERVICE_TOKEN）
+    ontology_db_path: str = ""  # Embedded SQLite 路径；缺省 {data_dir}/ontology.db
+    research_rag_mode: str = "hybrid"  # research 输入组装：full|hybrid|rag（18 号灰度；KB 无命中自动回退 full）
+
     # ===== 管理员 =====
     admin_email: str = "admin@example.com"
     admin_password: str = "ChangeMe@2026"

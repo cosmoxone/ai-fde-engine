@@ -170,12 +170,15 @@ GOLDEN_SAMPLES: list[GoldenSample] = [
 ]
 
 
-async def run_golden_eval(provider_filter: str | None = None) -> dict:
+async def run_golden_eval(provider_filter: str | None = None, rag_mode: str | None = None) -> dict:
     """
     黄金集评估：真实 LLM 下调研输出 vs 人工要点。
 
+    rag_mode: None=按当前配置（默认 hybrid）；"full"/"hybrid"/"rag" 显式指定——
+    v0.4 两栏对比用（18 号 ADR 终验：RAG 模式命中率不得低于 full）。
     返回:
-        {status: skipped|done, total, hit_rate, by_industry: {...}, misses: [...]}
+        {status: skipped|done, total, hit_rate, by_industry: {...}, misses: [...],
+         input_stats: {avg_prompt_chars, avg_full_chars, avg_reduction}}（done 时）
     """
     from ..config import get_settings
 
@@ -194,11 +197,30 @@ async def run_golden_eval(provider_filter: str | None = None) -> dict:
     hit_total, point_total = 0, 0
     by_industry: dict[str, list[float]] = {}
     misses: list[dict] = []
+    stats_list: list[dict] = []
 
     for s in samples:
         agent = ResearchAgent(f"golden-{s.sample_id}")
+        if rag_mode:
+            agent.settings.research_rag_mode = rag_mode  # 评估进程内显式指定（两栏对比）
         pack = match_template(s.industry)
         from ..templates import build_research_context
+
+        if rag_mode and rag_mode != "full":
+            # 两栏对比前提：样本文档先入 KB（每样本独立项目，Embedded 同步索引即写即检）
+            # ——否则 hybrid 检索空命中自动回退 full，两栏失真（对比无意义）
+            from ..knowledge import DocSpec, get_knowledge_gateway
+
+            get_knowledge_gateway().ingest_documents(
+                f"golden-{s.sample_id}",
+                [
+                    DocSpec(
+                        title=f"{s.sample_id}.md",
+                        content=s.doc_snippet,
+                        metadata={"doc_id": s.sample_id, "origin": "golden-eval"},
+                    )
+                ],
+            )
 
         result = await agent.execute(
             {
@@ -209,6 +231,8 @@ async def run_golden_eval(provider_filter: str | None = None) -> dict:
         )
         baseline = result.structured_output or {}
         text = json_dump_for_match(baseline)
+        if isinstance(result.metadata.get("input_stats"), dict):
+            stats_list.append(result.metadata["input_stats"])
 
         sample_hits = 0
         for point in s.expected_points:
@@ -221,13 +245,42 @@ async def run_golden_eval(provider_filter: str | None = None) -> dict:
         by_industry.setdefault(s.industry, []).append(sample_hits / len(s.expected_points))
 
     industry_rates = {k: sum(v) / len(v) for k, v in by_industry.items()}
+    avg = lambda key: (sum(s.get(key, 0) for s in stats_list) / len(stats_list)) if stats_list else 0  # noqa: E731
     return {
         "status": "done",
         "total": len(samples),
         "hit_rate": round(hit_total / point_total, 4) if point_total else 0.0,
         "by_industry": {k: round(v, 4) for k, v in industry_rates.items()},
         "misses": misses,
+        "input_stats": {
+            "avg_prompt_chars": round(avg("prompt_chars")),
+            "avg_full_chars": round(avg("full_chars")),
+            "avg_reduction": round(avg("reduction"), 3),
+        },
         "note": "目标：命中率≥80%（docs/10-商业计划 §4 价值层①验收）",
+    }
+
+
+async def run_golden_rag_compare() -> dict:
+    """v0.4 两栏对比（18 号 ADR 终验协议）：full × hybrid(/rag) 同集双跑。
+
+    判据：rag 栏 hit_rate ≥ full 栏（≥100% 不倒退）方可确认 RAG 化默认模式；
+    倒退则按 18 号 §6 预案回退（research_rag_mode 默认改 full）。
+    无 Key 时返回 skipped（与 run_golden_eval 同语义）。
+    """
+    modes = ("full", "hybrid")
+    columns = {}
+    for mode in modes:
+        res = await run_golden_eval(rag_mode=mode)
+        if res.get("status") != "done":
+            return {"status": "skipped", "reason": res.get("reason", "未配置 Key"), "mode": mode}
+        columns[mode] = res
+    verdict = "pass" if columns["hybrid"]["hit_rate"] >= columns["full"]["hit_rate"] else "regress"
+    return {
+        "status": "done",
+        "verdict": verdict,
+        "columns": columns,
+        "note": "pass=RAG 化维持；regress=按 18 号预案回退 full 默认",
     }
 
 

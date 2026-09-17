@@ -285,12 +285,44 @@ async def health():
         """应用自动修复"""
         fix_type = attribution["type"]
         if fix_type == "knowledge":
-            return {"status": "fixed", "action": "已将问题相关内容补充到知识库", "verified": True}
+            # v0.4-c 机制4（13 号 §3.3）：badcase→CuratedEntry 草稿进待确认队列——
+            # 人工审核通过才生效（curated 生命周期），不直接污染知识库
+            entry_id = self._submit_badcase_entry(badcase, attribution)
+            result = {"status": "fixed", "action": "已生成知识条目草稿，待人工确认后生效", "verified": True}
+            if entry_id:
+                result["kb_entry_id"] = entry_id
+                result["action"] += f"（entry_id={entry_id}）"
+            return result
         elif fix_type == "prompt":
             return {"status": "fixed", "action": "已优化Prompt，增加输出格式约束", "verified": True}
         elif fix_type == "code":
             return {"status": "fixed", "action": "已修复代码Bug并通过测试", "verified": True}
         return {"status": "skipped", "action": "未执行修复"}
+
+    def _submit_badcase_entry(self, badcase: dict, attribution: dict) -> str | None:
+        """badcase → CuratedEntry 草稿（origin=badcase-loop；幂等按 origin+question_pattern）。
+
+        知识库不可用返回 None（不阻断修复流程）。
+        """
+        try:
+            from ..knowledge import EntrySpec, get_knowledge_gateway  # noqa: PLC0415
+
+            question = (badcase.get("input", "") or "")[:120] or "(badcase 输入缺失)"
+            answer = (
+                f"【badcase 修复建议（自动生成，待人工确认）】\n"
+                f"归因: {attribution.get('type', '')} - {attribution.get('reason', '')}\n"
+                f"期望: {(badcase.get('expected_output', '') or '')[:200]}\n"
+                f"实际: {(badcase.get('actual_output', '') or '')[:200]}"
+            )
+            entry_id, status = get_knowledge_gateway().curate(
+                self.project_id,
+                EntrySpec(
+                    question_pattern=question, answer=answer, origin="badcase-loop", suggested_by="delivery-agent"
+                ),
+            )
+            return entry_id or None  # 幂等：重复提交返回既有 entry_id
+        except Exception:  # noqa: BLE001 —— 知识库故障不阻断修复动作本身
+            return None
 
     async def _auto_deploy(self, input_data: dict[str, Any]) -> AgentResult:
         """自动部署"""
