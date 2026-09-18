@@ -113,3 +113,5 @@ client_viewer 只读白名单：由 CE OpenAPI 端点清单自动生成（GET �
 | --- | --- | --- |
 | v1.0-draft | 2026-09-18 | 初版（OIDC/多租户下沉 CE 方案）——**已被拍板撤销** |
 | v1.1-draft | 2026-09-18 | **修订**：多租户/OIDC/PG 移出 CE → TE；CE=AuthProvider 抽象+LocalAuthProvider（单用户默认/本地多用户可选）；TE=CasdoorAuthProvider 整块替换；工作量 5→3 周；D1-D3 拍板落档 |
+| v1.1-impl-1 | 2026-09-18 | **一阶段实施合入**（commit 9cbb015）：provider 抽象+两档+邀请码流+登录页+auth_guard；562 passed（旧 554 零回归） |
+| v1.1-impl-2 | 2026-09-18 | **二阶段实施合入**：/auth/users×4 管理端点（列表/启停/项目角色分配/移除，防最后 admin 锁死）；main.py project_guard 全局依赖（50 处 {project_id} 端点零改动接入矩阵，method→read/write 推导）；create_project 归属 owner_user_id+member 创建者自动 project_owner；list_projects 非成员过滤（两用户互不可见）；/me 增 project_roles+users_enabled；client_viewer 白名单自动生成+契约测试；Dashboard 成员管理页（多用户 admin 显隐）；修登录页 JS {{}} 残留（P-5 后遗症）；Dockerfile 补 COPY static/（存量缺口：镜像从未含 Dashboard，CI 冒烟只验 health 未暴露→P-9）；573 passed（+10） |

@@ -123,6 +123,7 @@ pre { background: var(--bg-page); border: 1px solid var(--bd); border-radius: 6p
   <div class="nav-item" data-page="ontology"><span class="icon">🕸️</span><span>本体图谱</span></div>
   <div class="nav-item" data-page="selfservice"><span class="icon">🤝</span><span>自助交付</span></div>
   <div class="nav-item" data-page="memoryhub"><span class="icon">🧠</span><span>经验库</span></div>
+  <div class="nav-item" data-page="members" id="nav-members" style="display:none;"><span class="icon">👥</span><span>成员管理</span></div>
   <div class="nav-item" data-page="api"><span class="icon">🔌</span><span>API文档</span></div>
   <div id="theme-toggle" onclick="toggleTheme()" style="margin-top:auto;padding:12px 20px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:15px;color:var(--tx-weak);border-top:1px solid var(--bd);"><span class="icon" id="theme-icon">🌙</span><span id="theme-label">亮色模式</span></div>
   <div id="user-box" style="padding:12px 20px;font-size:13.5px;color:var(--tx-faint);border-top:1px solid var(--bd);"></div>
@@ -335,6 +336,46 @@ pre { background: var(--bg-page); border: 1px solid var(--bd); border-radius: 6p
   </div>
 
   <!-- API文档页 -->
+  <!-- 成员管理页（v0.5 二阶段：多用户档 admin 专用，单用户档隐藏） -->
+  <div class="page" id="page-members">
+    <div class="page-header">
+      <div><h1>成员管理</h1><div class="subtitle">本地多用户档：邀请成员 · 启用/禁用 · 项目角色分配（admin 专用）</div></div>
+      <button class="btn btn-primary" onclick="genInviteMembers()">生成邀请码</button>
+    </div>
+    <div class="panel" id="members-invite-panel" style="display:none;margin-bottom:20px;">
+      <div class="panel-title">邀请码（一次性，新用户在登录页凭码激活）</div>
+      <div id="members-invite-code" style="font-family:monospace;font-size:16px;color:var(--accent);padding:8px 0;"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">用户列表 <span style="color:var(--tx-faint);font-weight:400;font-size:13px;margin-left:8px;"></span><span class="refresh-btn" onclick="loadMembers()">🔄 刷新</span></div>
+      <table style="width:100%;border-collapse:collapse;font-size:13.5px;">
+        <thead>
+          <tr style="text-align:left;color:var(--tx-faint);border-bottom:1px solid var(--bd);">
+            <th style="padding:8px 10px;">用户</th><th style="padding:8px 10px;">平台角色</th>
+            <th style="padding:8px 10px;">状态</th><th style="padding:8px 10px;">项目角色</th><th style="padding:8px 10px;">操作</th>
+          </tr>
+        </thead>
+        <tbody id="members-tbody"></tbody>
+      </table>
+      <div id="members-empty" style="display:none;color:var(--tx-faint);padding:16px;">暂无用户数据</div>
+    </div>
+    <div class="panel" style="margin-top:20px;">
+      <div class="panel-title">分配项目角色</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:6px 0;">
+        <select id="member-project-sel" style="padding:8px;border-radius:6px;background:var(--bg-2);color:var(--tx);border:1px solid var(--bd);"></select>
+        <select id="member-user-sel" style="padding:8px;border-radius:6px;background:var(--bg-2);color:var(--tx);border:1px solid var(--bd);"></select>
+        <select id="member-role-sel" style="padding:8px;border-radius:6px;background:var(--bg-2);color:var(--tx);border:1px solid var(--bd);">
+          <option value="project_owner">project_owner（负责人）</option>
+          <option value="fde" selected>fde（交付工程师）</option>
+          <option value="domain_expert">domain_expert（领域专家·审核）</option>
+          <option value="client_viewer">client_viewer（客户·只读）</option>
+        </select>
+        <button class="btn btn-primary" onclick="assignRole()">分配</button>
+        <span style="color:var(--tx-faint);font-size:12.5px;">角色语义：owner/fde=读写 · expert=读+审核 · viewer=只读（白名单 GET）</span>
+      </div>
+    </div>
+  </div>
+
   <div class="page" id="page-api">
     <div class="page-header">
       <div><h1>API 接入文档</h1><div class="subtitle">两种使用模式：交互式调用 / 后台异步流水线</div></div>
@@ -673,6 +714,9 @@ async function loadUserBox() {
       box.innerHTML = `<div>👤 ${j.user.display_name}（${j.user.platform_role}）</div>
         <div style="margin-top:6px;"><a href="#" onclick="doLogout();return false" style="color:var(--accent);">退出登录</a></div>`;
     } else { box.innerHTML = '👤 本地单用户'; }
+    // 成员管理页：多用户档且 admin 才显示（v0.5 二阶段）
+    const nav = document.getElementById('nav-members');
+    if (nav) nav.style.display = (j.users_enabled && j.user && j.user.platform_role === 'admin') ? 'flex' : 'none';
   } catch (e) { box.innerHTML = ''; }
 }
 async function genInvite() {
@@ -685,6 +729,67 @@ async function doLogout() {
   location.href = '/api/v1/auth/login';
 }
 loadUserBox();
+
+// ===== 成员管理（v0.5 二阶段：admin 专用）=====
+let _membersProjects = [];
+async function loadMembers() {
+  const tbody = document.getElementById('members-tbody');
+  if (!tbody) return;
+  try {
+    const [uj, pj] = await Promise.all([api('/auth/users'), api('/projects')]);
+    _membersProjects = pj.projects || [];
+    const users = uj.users || [];
+    document.getElementById('members-empty').style.display = users.length ? 'none' : 'block';
+    tbody.innerHTML = users.map(u => {
+      const roles = Object.entries(u.project_roles || {}).map(([pid, role]) => {
+        const p = _membersProjects.find(x => x.id === pid);
+        return `<span style="display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border-radius:10px;background:var(--bg-2);border:1px solid var(--bd);font-size:12px;">${p ? p.name : pid}：${role} <span style="cursor:pointer;color:var(--tx-faint);" onclick="removeRole('${u.id}','${pid}')">✕</span></span>`;
+      }).join('') || '<span style="color:var(--tx-faint);">—</span>';
+      const toggleBtn = u.status === 'active'
+        ? `<button class="btn btn-sm" onclick="toggleUser('${u.id}','disabled')">禁用</button>`
+        : `<button class="btn btn-primary btn-sm" onclick="toggleUser('${u.id}','active')">启用</button>`;
+      return `<tr style="border-bottom:1px solid var(--bd);">
+        <td style="padding:8px 10px;">${u.name}<div style="color:var(--tx-faint);font-size:11.5px;">${u.id}</div></td>
+        <td style="padding:8px 10px;">${u.platform_role}</td>
+        <td style="padding:8px 10px;color:${u.status === 'active' ? 'var(--ok, #5cc98c)' : 'var(--warn, #ffcf7d)'};">${u.status === 'active' ? '✅ 启用' : '⛔ 禁用'}</td>
+        <td style="padding:8px 10px;max-width:340px;">${roles}</td>
+        <td style="padding:8px 10px;">${toggleBtn}</td>
+      </tr>`;
+    }).join('');
+    // 分配角色下拉：用户（active 优先）/项目
+    const us = document.getElementById('member-user-sel'), ps = document.getElementById('member-project-sel');
+    us.innerHTML = users.filter(u => u.status === 'active').map(u => `<option value="${u.id}">${u.name}</option>`).join('');
+    ps.innerHTML = _membersProjects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" style="padding:14px;color:var(--tx-faint);">加载失败：${e.message || e}</td></tr>`;
+  }
+}
+async function genInviteMembers() {
+  try {
+    const r = await api('/auth/invites', { method: 'POST' });
+    document.getElementById('members-invite-panel').style.display = 'block';
+    document.getElementById('members-invite-code').textContent = r.invite_code || '生成失败';
+  } catch (e) { alert(e.message || '生成失败（需 admin 权限）'); }
+}
+async function toggleUser(uid, status) {
+  const j = await api(`/auth/users/${uid}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+  if (j.detail) { alert(typeof j.detail === 'string' ? j.detail : '操作失败'); return; }
+  loadMembers();
+}
+async function assignRole() {
+  const uid = document.getElementById('member-user-sel').value;
+  const pid = document.getElementById('member-project-sel').value;
+  const role = document.getElementById('member-role-sel').value;
+  if (!uid || !pid) { alert('请选择用户与项目'); return; }
+  const j = await api(`/auth/users/${uid}/projects/${pid}`, { method: 'PUT', body: JSON.stringify({ role }) });
+  if (j.detail) { alert(typeof j.detail === 'string' ? j.detail : '分配失败'); return; }
+  loadMembers();
+}
+async function removeRole(uid, pid) {
+  const j = await api(`/auth/users/${uid}/projects/${pid}`, { method: 'DELETE' });
+  if (j.detail) { alert(typeof j.detail === 'string' ? j.detail : '移除失败'); return; }
+  loadMembers();
+}
 
 // 导航
 document.querySelectorAll('.nav-item').forEach(item => {
@@ -702,6 +807,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
     if (item.dataset.page === 'knowledge') loadKnowledge();
     if (item.dataset.page === 'ontology') loadOntology();
     if (item.dataset.page === 'selfservice') loadSelfService();
+    if (item.dataset.page === 'members') loadMembers();
   });
 });
 

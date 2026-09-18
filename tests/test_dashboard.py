@@ -49,8 +49,35 @@ class TestDashboardV04:
     def test_v05_ui_elements(self, client):
         """v0.5 界面：主题系统/八步价值流/批量确认/邀请卡。"""
         html = client.get("/dashboard").text
-        for token in ('data-theme="dark"', 'data-theme="light"', "toggleTheme",
-                      "VF_STEPS", "value-flow", "八步价值流", "renderValueFlow"):
+        for token in (
+            'data-theme="dark"',
+            'data-theme="light"',
+            "toggleTheme",
+            "VF_STEPS",
+            "value-flow",
+            "八步价值流",
+            "renderValueFlow",
+        ):
             assert token in html, f"缺 v0.5 元素: {token}"
         assert "kbConfirmAll" in html, "缺批量确认"
         assert "genInvite" in html, "缺邀请码生成"
+
+    def test_v05_members_page(self, client):
+        """v0.5 二阶段：成员管理页（DOM 断言——多用户 admin 专用，默认隐藏）。"""
+        html = client.get("/dashboard").text
+        for token in (
+            'data-page="members"',
+            'id="page-members"',
+            'id="nav-members"',
+            "members-tbody",
+            "loadMembers",
+            "assignRole",
+            "removeRole",
+            "toggleUser",
+            "genInviteMembers",
+            "member-role-sel",
+            "client_viewer",
+        ):
+            assert token in html, f"缺成员管理元素: {token}"
+        # 默认隐藏（display:none），由 loadUserBox 按 /auth/me 的 users_enabled+admin 显隐
+        assert 'id="nav-members" style="display:none;"' in html

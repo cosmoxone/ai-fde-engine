@@ -48,6 +48,7 @@ COPY --from=builder /install /usr/local
 
 # 复制应用代码
 COPY src/ ./src/
+COPY static/ ./static/
 COPY tests/ ./tests/
 COPY requirements.txt .
 COPY pyproject.toml .

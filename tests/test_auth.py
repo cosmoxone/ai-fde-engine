@@ -53,8 +53,8 @@ class TestSingleUserMode:
         assert p.current_user(None).is_admin
 
     def test_login_routes_fixed_structure(self):
-        """路由结构固定（6 条，导入时挂载一次）；单用户档 /login 返回无需登录提示。"""
-        assert len(LocalAuthProvider(users_enabled=False, data_dir="/tmp").login_routes().routes) == 6
+        """路由结构固定（10 条：6 登录面 + 4 成员管理，导入时挂载一次）；单用户档 /login 返回无需登录提示。"""
+        assert len(LocalAuthProvider(users_enabled=False, data_dir="/tmp").login_routes().routes) == 10
 
     def test_api_open_without_cookie(self):
         from src.main import app
@@ -135,3 +135,160 @@ class TestLocalMultiUser:
         with _authd_client(provider) as client:
             html = client.get("/api/v1/auth/login").text
             assert "管理员激活码" in html  # admin 未激活态
+            # P-5 回归：JS 不得残留 format 转义双大括号（浏览器 SyntaxError，登录按钮失效）
+            assert "function go(){" in html
+            assert "function v(id){" in html
+
+
+class TestAdminUserManagement:
+    """二阶段：成员管理端点矩阵（/auth/users*，仅 admin）。"""
+
+    @pytest.fixture()
+    def provider(self, tmp_path):
+        return LocalAuthProvider(users_enabled=True, data_dir=str(tmp_path), admin_invite_code="ADMIN-CODE-1")
+
+    @staticmethod
+    def _setup_team(provider):
+        """激活 boss(admin) 并直接造一个 member bob，返回 (bob_id, invite)。"""
+        with _authd_client(provider) as c:
+            r = c.post(
+                "/api/v1/auth/activate", json={"name": "boss", "password": "pass-12345", "invite_code": "ADMIN-CODE-1"}
+            )
+            assert r.status_code == 200
+            invite = c.post("/api/v1/auth/invites").json()["invite_code"]
+        provider._conn.execute(
+            "INSERT INTO local_users(id,name,pass_hash,platform_role) VALUES('u-bob','bob',?,'member')",
+            (hash_password("bob-12345"),),
+        )
+        provider._conn.commit()
+        return "u-bob", invite
+
+    def test_users_list_admin_only(self, provider):
+        _, _ = self._setup_team(provider)
+        with _authd_client(provider) as c:
+            assert c.get("/api/v1/auth/users").status_code == 401  # 未登录
+        # bob（member）登录后 403
+        with _authd_client(provider) as c:
+            c.post("/api/v1/auth/login", json={"name": "bob", "password": "bob-12345"})
+            assert c.get("/api/v1/auth/users").status_code == 403
+        # boss（admin）可见两名用户与角色
+        with _authd_client(provider) as c:
+            c.post("/api/v1/auth/login", json={"name": "boss", "password": "pass-12345"})
+            r = c.get("/api/v1/auth/users")
+            assert r.status_code == 200
+            names = {u["name"]: u for u in r.json()["users"]}
+            assert set(names) == {"boss", "bob"}
+            assert names["bob"]["platform_role"] == "member"
+
+    def test_disable_user_blocks_login_and_session(self, provider):
+        _, _ = self._setup_team(provider)
+        with _authd_client(provider) as c:
+            c.post("/api/v1/auth/login", json={"name": "boss", "password": "pass-12345"})
+            r = c.patch("/api/v1/auth/users/u-bob", json={"status": "disabled"})
+            assert r.status_code == 200
+        with _authd_client(provider) as c:
+            assert c.post("/api/v1/auth/login", json={"name": "bob", "password": "bob-12345"}).status_code == 401
+        # 启用恢复
+        with _authd_client(provider) as c:
+            c.post("/api/v1/auth/login", json={"name": "boss", "password": "pass-12345"})
+            c.patch("/api/v1/auth/users/u-bob", json={"status": "active"})
+        with _authd_client(provider) as c:
+            assert c.post("/api/v1/auth/login", json={"name": "bob", "password": "bob-12345"}).status_code == 200
+
+    def test_cannot_lock_out_last_admin(self, provider):
+        _, _ = self._setup_team(provider)
+        with _authd_client(provider) as c:
+            c.post("/api/v1/auth/login", json={"name": "boss", "password": "pass-12345"})
+            boss_id = c.get("/api/v1/auth/me").json()["user"]["id"]
+            assert c.patch(f"/api/v1/auth/users/{boss_id}", json={"status": "disabled"}).status_code == 403
+            assert c.patch(f"/api/v1/auth/users/{boss_id}", json={"platform_role": "member"}).status_code == 403
+
+    def test_assign_and_remove_project_role(self, provider):
+        _, _ = self._setup_team(provider)
+        with _authd_client(provider) as c:
+            c.post("/api/v1/auth/login", json={"name": "boss", "password": "pass-12345"})
+            # 非法角色/不存在用户
+            assert c.put("/api/v1/auth/users/u-bob/projects/p1", json={"role": "hacker"}).status_code == 400
+            assert c.put("/api/v1/auth/users/u-404/projects/p1", json={"role": "fde"}).status_code == 404
+            # 分配 → me 里的 project_roles 生效；重复分配=改角色（upsert）
+            assert c.put("/api/v1/auth/users/u-bob/projects/p1", json={"role": "fde"}).status_code == 200
+            assert c.put("/api/v1/auth/users/u-bob/projects/p1", json={"role": "client_viewer"}).status_code == 200
+        with _authd_client(provider) as c:
+            c.post("/api/v1/auth/login", json={"name": "bob", "password": "bob-12345"})
+            assert c.get("/api/v1/auth/me").json()["user"]["project_roles"] == {"p1": "client_viewer"}
+        with _authd_client(provider) as c:
+            c.post("/api/v1/auth/login", json={"name": "boss", "password": "pass-12345"})
+            assert c.delete("/api/v1/auth/users/u-bob/projects/p1").status_code == 200
+        with _authd_client(provider) as c:
+            c.post("/api/v1/auth/login", json={"name": "bob", "password": "bob-12345"})
+            assert c.get("/api/v1/auth/me").json()["user"]["project_roles"] == {}
+
+
+class TestProjectOwnership:
+    """二阶段：项目归属校验（guard + 列表过滤 + owner 自动授予）。多用户两用户互不可见。"""
+
+    @pytest.fixture()
+    def provider(self, tmp_path):
+        return LocalAuthProvider(users_enabled=True, data_dir=str(tmp_path), admin_invite_code="ADMIN-CODE-1")
+
+    def _client_as(self, provider, name, password):
+        ctx = _authd_client(provider)
+        return ctx, name, password
+
+    def test_member_creates_and_isolation(self, provider):
+        with _authd_client(provider) as c:  # boss(admin) 激活+邀请 bob
+            c.post(
+                "/api/v1/auth/activate", json={"name": "boss", "password": "pass-12345", "invite_code": "ADMIN-CODE-1"}
+            )
+            invite = c.post("/api/v1/auth/invites").json()["invite_code"]
+        with _authd_client(provider) as c:  # bob 激活并建项目
+            c.post("/api/v1/auth/activate", json={"name": "bob", "password": "bob-12345", "invite_code": invite})
+            r = c.post("/api/v1/projects", json={"name": "Bob 的项目", "client_name": "ACME"})
+            assert r.status_code == 200
+            pid = r.json()["project"]["id"]
+            assert r.json()["project"]["owner_user_id"]  # 归属落档
+            assert c.get(f"/api/v1/projects/{pid}").status_code == 200  # owner 自动授予→自己可见
+            assert c.post(f"/api/v1/projects/{pid}/documents", json={"title": "x"}).status_code in (
+                200,
+                422,
+            )  # 写权限在
+        with _authd_client(provider) as c:  # boss 生成第二个邀请码
+            c.post("/api/v1/auth/login", json={"name": "boss", "password": "pass-12345"})
+            invite2 = c.post("/api/v1/auth/invites").json()["invite_code"]
+        with _authd_client(provider) as c:  # carol 激活：对 bob 项目零可见
+            r = c.post(
+                "/api/v1/auth/activate", json={"name": "carol", "password": "carol-12345", "invite_code": invite2}
+            )
+            carol_id = r.json()["user_id"]
+            names = [p["name"] for p in c.get("/api/v1/projects").json()["projects"]]
+            assert names == []  # 列表过滤：非成员不可见
+            assert c.get(f"/api/v1/projects/{pid}").status_code == 403  # guard：直接访问被拒
+        with _authd_client(provider) as c:  # carol 被授 client_viewer：只读矩阵
+            c.post("/api/v1/auth/login", json={"name": "boss", "password": "pass-12345"})
+            assert (
+                c.put(f"/api/v1/auth/users/{carol_id}/projects/{pid}", json={"role": "client_viewer"}).status_code
+                == 200
+            )
+        with _authd_client(provider) as c:
+            c.post("/api/v1/auth/login", json={"name": "carol", "password": "carol-12345"})
+            assert c.get(f"/api/v1/projects/{pid}").status_code == 200  # read 放行
+            assert c.get(f"/api/v1/projects/{pid}/documents").status_code == 200
+            assert c.post(f"/api/v1/projects/{pid}/documents", json={"title": "hack"}).status_code == 403  # write 拒
+
+    def test_admin_sees_all_and_single_user_unaffected(self, provider):
+        with _authd_client(provider) as c:
+            c.post(
+                "/api/v1/auth/activate", json={"name": "boss", "password": "pass-12345", "invite_code": "ADMIN-CODE-1"}
+            )
+            r = c.post("/api/v1/projects", json={"name": "P1"})
+            pid = r.json()["project"]["id"]
+        with _authd_client(provider) as c:  # 另一个 member 建的项目，admin 也能全量看到
+            c.post("/api/v1/auth/login", json={"name": "boss", "password": "pass-12345"})
+            assert any(p["id"] == pid for p in c.get("/api/v1/projects").json()["projects"])
+            assert c.get(f"/api/v1/projects/{pid}").status_code == 200
+        # 单用户档：无 owner_user_id 字段、无过滤（v0.4 行为零变化）
+        single = LocalAuthProvider(users_enabled=False, data_dir="/tmp")
+        with _authd_client(single) as c:
+            r = c.post("/api/v1/projects", json={"name": "单用户项目"})
+            assert "owner_user_id" not in r.json()["project"]
+            assert c.get("/api/v1/projects").json()["total"] >= 1

@@ -232,7 +232,13 @@ class LocalAuthProvider:
             u = p.current_user(request)
             return {
                 "success": True,
-                "user": {"id": u.id, "display_name": u.display_name, "platform_role": u.platform_role},
+                "user": {
+                    "id": u.id,
+                    "display_name": u.display_name,
+                    "platform_role": u.platform_role,
+                    "project_roles": u.project_roles,
+                },
+                "users_enabled": p.users_enabled,
             }
 
         @r.post("/invites")
@@ -248,8 +254,111 @@ class LocalAuthProvider:
             p._conn.commit()
             return {"success": True, "invite_code": code}
 
+        # ---- 成员管理（二阶段：admin 专用，29 号 §10 移交任务） ----
+        @r.get("/users")
+        def list_users(request: Request):
+            p = _active()
+            u = p.current_user(request)
+            if not u.is_admin:
+                raise HTTPException(403, "仅管理员可查看用户列表")
+            return {"success": True, "users": p.list_users()}
+
+        @r.patch("/users/{user_id}")
+        async def update_user(user_id: str, request: Request):
+            p = _active()
+            u = p.current_user(request)
+            if not u.is_admin:
+                raise HTTPException(403, "仅管理员可修改用户")
+            body = await request.json()
+            status = body.get("status")
+            role = body.get("platform_role")
+            if status is not None and status not in ("active", "disabled"):
+                raise HTTPException(400, "status 仅 active|disabled")
+            if role is not None and role not in ("admin", "member"):
+                raise HTTPException(400, "platform_role 仅 admin|member")
+            # 保护：变更后不得无可用 admin（禁用自己/降级最后一个 admin 都会锁死系统）
+            if user_id == u.id and (status == "disabled" or role == "member"):
+                raise HTTPException(403, "不能禁用/降级当前登录的管理员")
+            p.update_user(user_id, status=status, platform_role=role)
+            return {"success": True}
+
+        @r.put("/users/{user_id}/projects/{project_id}")
+        async def assign_project_role(user_id: str, project_id: str, request: Request):
+            p = _active()
+            u = p.current_user(request)
+            if not u.is_admin:
+                raise HTTPException(403, "仅管理员可分配项目角色")
+            body = await request.json()
+            role = body.get("role", "")
+            if role not in ("project_owner", "fde", "domain_expert", "client_viewer"):
+                raise HTTPException(400, "role 仅 project_owner|fde|domain_expert|client_viewer")
+            if not p._conn.execute("SELECT 1 FROM local_users WHERE id=?", (user_id,)).fetchone():
+                raise HTTPException(404, "用户不存在")
+            p.assign_member(project_id, user_id, role)
+            return {"success": True}
+
+        @r.delete("/users/{user_id}/projects/{project_id}")
+        def remove_project_role(user_id: str, project_id: str, request: Request):
+            p = _active()
+            u = p.current_user(request)
+            if not u.is_admin:
+                raise HTTPException(403, "仅管理员可移除项目成员")
+            p.remove_member(project_id, user_id)
+            return {"success": True}
+
         self._router = r
         return r
+
+    # ---- 用户/成员数据操作（供 API 层调用；单用户档调用为 no-op 防御） ----
+    def list_users(self) -> list[dict]:
+        if not self.users_enabled:
+            return []
+        rows = self._conn.execute(
+            "SELECT id,name,platform_role,status,created_at FROM local_users ORDER BY created_at"
+        ).fetchall()
+        out = []
+        for r in rows:
+            roles = {
+                m["project_id"]: m["role"]
+                for m in self._conn.execute("SELECT project_id, role FROM project_members WHERE user_id=?", (r["id"],))
+            }
+            out.append(
+                {
+                    "id": r["id"],
+                    "name": r["name"],
+                    "platform_role": r["platform_role"],
+                    "status": r["status"],
+                    "created_at": r["created_at"],
+                    "project_roles": roles,
+                }
+            )
+        return out
+
+    def update_user(self, user_id: str, *, status: str | None = None, platform_role: str | None = None) -> bool:
+        if not self.users_enabled:
+            return False
+        if status is not None:
+            self._conn.execute("UPDATE local_users SET status=? WHERE id=?", (status, user_id))
+        if platform_role is not None:
+            self._conn.execute("UPDATE local_users SET platform_role=? WHERE id=?", (platform_role, user_id))
+        self._conn.commit()
+        return True
+
+    def assign_member(self, project_id: str, user_id: str, role: str) -> None:
+        if not self.users_enabled:
+            return
+        self._conn.execute(
+            "INSERT INTO project_members(project_id,user_id,role) VALUES(?,?,?) "
+            "ON CONFLICT(project_id,user_id) DO UPDATE SET role=excluded.role",
+            (project_id, user_id, role),
+        )
+        self._conn.commit()
+
+    def remove_member(self, project_id: str, user_id: str) -> None:
+        if not self.users_enabled:
+            return
+        self._conn.execute("DELETE FROM project_members WHERE project_id=? AND user_id=?", (project_id, user_id))
+        self._conn.commit()
 
     # ---- 内部 ----
     def _ensure_invite_table(self) -> None:
@@ -286,12 +395,12 @@ button{width:100%;padding:10px;background:#6c8cff;color:#fff;border:none;border-
 </div><script>
 const ADMIN_PENDING = __ADMIN_PENDING__;
 document.getElementById('code').placeholder = ADMIN_PENDING ? '管理员激活码' : '邀请码（新用户）/ 留空登录';
-async function go(){{
-  const b={{name:v('name'),password:v('password'),invite_code:v('code')}};
-  let r=await fetch('/api/v1/auth/login',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(b)}});
-  if(r.status===403 && b.invite_code){{ r=await fetch('/api/v1/auth/activate',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(b)}});}}
+async function go(){
+  const b={name:v('name'),password:v('password'),invite_code:v('code')};
+  let r=await fetch('/api/v1/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
+  if(r.status===403 && b.invite_code){ r=await fetch('/api/v1/auth/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});}
   const j=await r.json();
-  if(r.ok){{location.href='/dashboard';}}else{{alert(j.detail||'失败');}}
-}}
-function v(id){{return document.getElementById(id).value;}}
+  if(r.ok){location.href='/dashboard';}else{alert(j.detail||'失败');}
+}
+function v(id){return document.getElementById(id).value;}
 </script></body></html>"""

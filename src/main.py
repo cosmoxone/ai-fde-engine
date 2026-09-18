@@ -147,12 +147,28 @@ async def auth_guard(request: Request):
     return
 
 
+async def project_guard(request: Request):
+    """项目归属校验（v0.5 二阶段，25 号 §4）：路径含 project_id 的端点按角色矩阵判定。
+
+    - 单用户档/admin：恒通过（v0.4 行为零变化）
+    - action 推导：GET/HEAD/OPTIONS→read，其余→write（review 动作属审核队列端点，不带 project_id，平台级）
+    """
+    project_id = request.path_params.get("project_id")
+    if not project_id:
+        return
+    action = "read" if request.method in ("GET", "HEAD", "OPTIONS") else "write"
+    provider = get_auth_provider()
+    user = provider.current_user(request)  # auth_guard 已认证，此处幂等
+    if not provider.verify_project_access(user, project_id, action):
+        raise HTTPException(status_code=403, detail=f"无项目 {project_id} 的 {action} 权限")
+
+
 app = FastAPI(
     title=settings.app_name,
     version="0.4.0",
     description="AI驱动的FDE交付引擎 - 调研、设计、开发、迭代全流程AI化",
     lifespan=lifespan,
-    dependencies=[Depends(auth_guard)],
+    dependencies=[Depends(auth_guard), Depends(project_guard)],
 )
 app.include_router(get_auth_provider().login_routes())
 
@@ -408,8 +424,8 @@ async def health_check():
 
 # ===== 项目管理 =====
 @app.post("/api/v1/projects")
-async def create_project(req: ProjectCreate):
-    """创建项目"""
+async def create_project(req: ProjectCreate, request: Request):
+    """创建项目（多用户档：owner 归属创建者；member 创建者自动成为 project_owner——否则自己都看不到）"""
     project_id = str(uuid.uuid4())
     project = {
         "id": project_id,
@@ -421,6 +437,12 @@ async def create_project(req: ProjectCreate):
         "created_at": __import__("time").time(),
         "config": {},
     }
+    provider = get_auth_provider()
+    if provider.users_enabled:
+        user = provider.current_user(request)
+        project["owner_user_id"] = user.id
+        if not user.is_admin:
+            provider.assign_member(project_id, user.id, "project_owner")
     get_storage().create_project(project)
     # 初始化记忆
     memory = get_memory_manager(project_id)
@@ -433,9 +455,15 @@ async def create_project(req: ProjectCreate):
 
 
 @app.get("/api/v1/projects")
-async def list_projects():
-    """项目列表"""
+async def list_projects(request: Request):
+    """项目列表（多用户档：admin 全量；member 仅可见有角色或归属自己的项目）"""
     projects = get_storage().list_projects()
+    provider = get_auth_provider()
+    if provider.users_enabled:
+        user = provider.current_user(request)
+        if not user.is_admin:
+            ids = set(user.project_roles.keys())
+            projects = [p for p in projects if p.get("id") in ids or p.get("owner_user_id") == user.id]
     return {"success": True, "projects": projects, "total": len(projects)}
 
 
