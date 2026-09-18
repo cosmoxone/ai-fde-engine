@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     ontology_service_url: str = ""  # 本体独立服务 Remote（契约 20 号）；空 = Embedded 默认
     ontology_service_token: str = ""  # 独立服务 Bearer token（ONTOLOGY_SERVICE_TOKEN）
     ontology_db_path: str = ""  # Embedded SQLite 路径；缺省 {data_dir}/ontology.db
+
+    # ===== 认证（v0.5，25 号：AuthProvider 替换点 + 本地默认）=====
+    auth_provider: str = "local"  # 认证提供方：local 默认｜外部注册名（TE casdoor 整块替换）
+    local_users_enabled: bool = False  # 本地多用户档（邀请码+本地口令；默认单用户零变化）
+    admin_invite_code: str = ""  # 首个管理员激活码（本地多用户档启用时设置）
     research_rag_mode: str = "hybrid"  # research 输入组装：full|hybrid|rag（18 号灰度；KB 无命中自动回退 full）
 
     # ===== 管理员 =====

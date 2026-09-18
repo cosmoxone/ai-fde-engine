@@ -11,7 +11,7 @@ import uuid
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from fastapi import BackgroundTasks, Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -22,6 +22,7 @@ from .agents.design import DesignAgent
 from .agents.research import ResearchAgent
 from .agents.self_service import SelfServiceAgent
 from .agents.training import TrainingAgent
+from .auth import get_auth_provider
 from .config import get_settings
 from .evaluation.evaluator import Evaluator
 from .exporter import build_deliverables, export_zip
@@ -118,12 +119,42 @@ async def _iteration_scheduler():
                     print(f"[Scheduler] {project['id']} 定时迭代失败: {e}")
 
 
+# ===== 认证 guard（v0.5，25 号）：全局依赖——单用户档恒通过（v0.4 行为零变化）=====
+_PUBLIC_EXACT = frozenset(
+    {
+        "/",
+        "/health",
+        "/api/v1/health",
+        "/dashboard",
+        "/login",
+        "/docs",
+        "/openapi.json",
+        "/redoc",
+        "/favicon.ico",
+        "/api/v1/auth/login",
+        "/api/v1/auth/activate",
+        "/api/v1/auth/logout",
+    }
+)
+_PUBLIC_PREFIXES = ("/static/",)
+
+
+async def auth_guard(request: Request):
+    path = request.url.path
+    if path in _PUBLIC_EXACT or path.startswith(_PUBLIC_PREFIXES):
+        return
+    get_auth_provider().current_user(request)  # 单用户档恒 local-admin；多用户档未登录抛 401
+    return
+
+
 app = FastAPI(
     title=settings.app_name,
     version="0.4.0",
     description="AI驱动的FDE交付引擎 - 调研、设计、开发、迭代全流程AI化",
     lifespan=lifespan,
+    dependencies=[Depends(auth_guard)],
 )
+app.include_router(get_auth_provider().login_routes())
 
 app.add_middleware(
     CORSMiddleware,
