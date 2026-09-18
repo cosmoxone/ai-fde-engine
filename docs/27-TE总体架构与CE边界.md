@@ -67,7 +67,8 @@
 ```
 单机 CE（默认）      ：AuthProvider=local·单用户档 → 内置 local-admin，v0.4 行为零变化
 本地多用户（可选）    ：AuthProvider=local·多用户档 → 邀请码+本地口令+签名 cookie
-TE（ee 替换）        ：AuthProvider=casdoor → OIDC 授权码流+JWT 会话；用户目录/Org 同步自 CASDoor
+TE（本地直跑，默认） ：AuthProvider=local·多用户档 → 同 CE 本地多用户（ee 层装配：默认开启+锁死校验）——免 CASDoor 跑通多用户全流程（D5，2026-09-18）
+TE（SaaS 正式，M1）  ：AuthProvider=casdoor → OIDC 授权码流+JWT 会话；用户目录/Org 同步自 CASDoor
 EE（专属部署）       ：同 TE 替换件；CASDoor 可联邦企业 IdP（仅配置差异）
 ```
 
@@ -121,9 +122,11 @@ EE（专属部署）       ：同 TE 替换件；CASDoor 可联邦企业 IdP（�
 | D2 | 认证=CASDoor（统一认证中心）；LLM 代理计费=Token Gateway | 09-18 | 25/24 号 |
 | D3 | nf/RPA 双版本特性：CE 精简面冻结 × TE 完整面 | 09-18 | 26 号 |
 | D4 | **知识库形态分轨**：CE=Embedded 内置唯一推荐（外部对接不进主线叙事）；TE=默认平台 kb-os 池 | 09-18 | 24/27 号 |
+| D5 | **TE 认证双形态并存**：local 本地多用户直跑（TE 默认，免 CASDoor 即可跑通多用户流程——开发/内测/Lite 形态）× casdoor（M1，SaaS 正式形态）；经替换制切换，ee 层装配校验 fail-fast | 09-18 | 本文 §4；ee/design-te-v1 §2.0 |
 
 ## 10. 变更记录
 
 | 版本 | 日期 | 变更 |
 | --- | --- | --- |
 | v1.0 | 2026-09-18 | 定稿：三版演进存档 / 最终架构总图 / CE 边界清单与判定规则 / 替换制认证 / 外部系统对接矩阵 / 演进路线 / 开放问题与决策记录 |
+| v1.0.1 | 2026-09-18 | §4 补 TE 本地直跑形态行 + 决策 D5（TE 认证双形态并存，本地多用户直跑为 TE 默认） |

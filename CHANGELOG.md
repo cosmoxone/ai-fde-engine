@@ -3,6 +3,27 @@
 本项目遵循 [Semantic Versioning](https://semver.org/lang/zh-CN/)。
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased] - 认证替换点装配机制落地（TE 本地多用户直跑的 CE 侧基建）
+
+> 背景：TE 版本引入"本地多用户直跑"（免 CASDoor，见 ee/docs/design-te-v1 §2.0 与 27 号决策 D5）。
+> 本条目为 CE 侧配套：25 号承诺的"AuthProvider 替换点 + 装配机制"中，装配机制此前仅有
+> AUTH_PROVIDER 入口分支，无注册面——本次补齐，CE 默认行为零变化（573→578 用例全绿）。
+
+### Added
+
+- `src/auth` 替换 provider 注册表：`register_auth_provider(name, factory)` / `get_provider_factory(name)` /
+  `registered_providers()`——商业包装配时注册（如 ee 层 casdoor），内核仅见协议、零感知实现
+- `set_auth_provider(provider)`：装配期显式注入单例（TE 入口/测试用；优先级高于 AUTH_PROVIDER 环境装配）
+- `AuthProvider` 协议新增 `users_enabled: bool` 成员（多用户档标记：归属落档/列表过滤等内核多用户行为的开关语义，
+  替换 provider 须声明）
+- `LocalAuthProvider.admin_needs_activation()` 公开别名（装配层校验用；单用户档恒 False）
+- 替换点契约测试（25 号 §7 验证口径）：注册→按名装配、未注册名回落单用户档且**提示运维**（不再无感降级）、
+  替换 provider 端到端（guard/项目矩阵/归属过滤照常 + 装配序子进程验证登录路由换血）
+
+### Changed
+
+- `get_auth_provider()` 装配优先级：注入 > 环境注册名 > local > 未注册名回落（回落行为与 v0.5 一致，新增 stderr 提示）
+
 ## [0.4.0] - 2026-09-17 知识与本体（v0.4-a 契约接入 × v0.4-b 本体抽取 × v0.4-c Research RAG 化）
 
 > **发布概要**：测试 488→549 全绿（含契约套件 13 用例）；契约 14 号 v1.2 定版并双实现（Embedded × kb-os 真机）对拍一致；

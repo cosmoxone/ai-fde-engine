@@ -294,3 +294,182 @@ class TestProjectOwnership:
             r = c.post("/api/v1/projects", json={"name": "单用户项目"})
             assert "owner_user_id" not in r.json()["project"]
             assert c.get("/api/v1/projects").json()["total"] >= 1
+
+
+class _StubReplaceProvider:
+    """替换点契约测试桩（25 号 §7）：模拟 casdoor 类外部 provider——
+    头 X-User 承载身份、自带登录路由、独立的项目访问矩阵。"""
+
+    users_enabled = True
+    NAME = "stub"
+
+    def __init__(self):
+        from fastapi import APIRouter
+
+        self._router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
+
+        @self._router.get("/login")
+        def login_page():
+            from fastapi.responses import HTMLResponse
+
+            return HTMLResponse("<h3>stub-login-page</h3>")
+
+    def current_user(self, request):
+        from fastapi import HTTPException
+
+        from src.auth import User
+
+        uid = request.headers.get("X-User", "")
+        if not uid:
+            raise HTTPException(status_code=401, detail="未登录(stub)")
+        if uid == "boss":
+            return User(id=uid, display_name=uid, platform_role="admin", project_roles={})
+        return User(id=uid, display_name=uid, platform_role="member", project_roles={"p1": "fde"})
+
+    def verify_project_access(self, user, project_id: str, action: str = "read") -> bool:
+        return user.is_admin or project_id in user.project_roles
+
+    def login_routes(self):
+        return self._router
+
+
+@pytest.fixture()
+def patched_settings(monkeypatch):
+    """provider 单例隔离 + settings 单例字段就地改写（monkeypatch 自动还原）。
+
+    注意：**不得** get_settings.cache_clear()——清缓存会让 src.main 等模块导入时绑定的
+    settings 引用孤儿化（save 改新单例、/health 读旧引用），污染后续测试模块。
+    """
+    from src.auth import reset_auth_provider
+
+    reset_auth_provider()
+    yield monkeypatch
+    reset_auth_provider()
+
+
+class TestProviderReplacement:
+    """替换点契约（25 号 §7 验证口径）：注册→选择→整块替换后全端点仍通；未注册回落不裸奔。"""
+
+    def test_register_and_env_selection(self, patched_settings):
+        import src.auth as auth_mod
+        from src.auth import get_auth_provider, registered_providers
+        from src.config import get_settings
+
+        calls: list[int] = []
+        patched_settings.setattr(get_settings(), "auth_provider", "stub")
+        auth_mod.register_auth_provider("stub", lambda: (calls.append(1), _StubReplaceProvider())[1])
+        p = get_auth_provider()
+        assert isinstance(p, _StubReplaceProvider) and calls == [1]
+        assert get_auth_provider() is p  # 单例
+        assert "stub" in registered_providers()
+
+    def test_unregistered_name_falls_back_single_user(self, patched_settings, capsys):
+        from src.auth import get_auth_provider
+        from src.config import get_settings
+
+        patched_settings.setattr(get_settings(), "auth_provider", "casdoor")
+        p = get_auth_provider()
+        assert isinstance(p, LocalAuthProvider) and not p.users_enabled  # 回落单用户档（既有行为）
+        assert "未注册" in capsys.readouterr().out  # 但必须提示运维，不能无感降级
+
+    def test_set_auth_provider_injection(self, patched_settings):
+        import src.auth as auth_mod
+        from src.auth import get_auth_provider
+
+        stub = _StubReplaceProvider()
+        auth_mod.set_auth_provider(stub)
+        assert get_auth_provider() is stub  # 注入优先于环境装配
+
+    def test_stub_provider_guards_honor_replacement(self, patched_settings):
+        """运行时 guard 遵守替换 provider：未认证 401、项目矩阵/归属过滤照常（登录路由属装配期，见下）。"""
+        stub = _StubReplaceProvider()
+        with _authd_client(stub) as c:
+            assert c.get("/api/v1/projects").status_code == 401  # guard 走 stub.current_user
+            r = c.get("/api/v1/projects", headers={"X-User": "boss"})
+            assert r.status_code == 200
+            r = c.post("/api/v1/projects", json={"name": "P1"}, headers={"X-User": "boss"})
+            pid = r.json()["project"]["id"]
+            assert r.json()["project"]["owner_user_id"] == "boss"  # users_enabled=True → 归属落档
+            assert c.get("/api/v1/projects", headers={"X-User": "alice"}).json()["total"] == 0
+            assert c.get(f"/api/v1/projects/{pid}", headers={"X-User": "alice"}).status_code == 403
+            assert c.get("/api/v1/projects/p1", headers={"X-User": "alice"}).status_code == 404  # 矩阵放行→业务 404
+
+    def test_replacement_assembly_end_to_end(self, tmp_path):
+        """整块替换契约（装配序）：先注入 provider 再导入 src.main——登录路由换血 + 全端点通。
+        用子进程隔离（src.main 的 app/login 路由在进程内是装配期一次性挂载，须按真实装配序验证）。"""
+        import os
+        import subprocess
+        import sys
+        from pathlib import Path
+
+        repo_root = str(Path(__file__).resolve().parents[1])
+        env = {
+            **os.environ,
+            "PYTHONPATH": repo_root,
+            "STORAGE_PROVIDER": "memory",
+            "MEMORY_STORAGE_DIR": str(tmp_path / "memory"),
+            "OPENHANDS_WORKSPACE_BASE": str(tmp_path / "ws"),
+            "KNOWLEDGE_DB_PATH": str(tmp_path / "kb.db"),
+            "ONTOLOGY_DB_PATH": str(tmp_path / "onto.db"),
+            "DATA_DIR": str(tmp_path / "data"),
+            "AUTH_PROVIDER": "stub",
+        }
+        os.makedirs(env["MEMORY_STORAGE_DIR"], exist_ok=True)
+        os.makedirs(env["OPENHANDS_WORKSPACE_BASE"], exist_ok=True)
+        proc = subprocess.run(
+            [sys.executable, "-c", _ASSEMBLY_PROBE], env=env, cwd=repo_root, capture_output=True, text=True, timeout=180
+        )
+        assert proc.returncode == 0 and "ASSEMBLY-OK" in proc.stdout, f"stdout={proc.stdout}\nstderr={proc.stderr}"
+
+_ASSEMBLY_PROBE = """
+import os
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import HTMLResponse
+from fastapi.testclient import TestClient
+
+from src.auth import User, set_auth_provider
+
+
+class Stub:
+    users_enabled = True
+    NAME = "stub"
+
+    def __init__(self):
+        r = APIRouter(prefix="/api/v1/auth")
+
+        @r.get("/login")
+        def lp():
+            return HTMLResponse("<h3>stub-login-page</h3>")
+
+        self._r = r
+
+    def current_user(self, request):
+        uid = request.headers.get("X-User", "")
+        if not uid:
+            raise HTTPException(401, "未登录(stub)")
+        if uid == "boss":
+            return User(id=uid, display_name=uid, platform_role="admin")
+        return User(id=uid, display_name=uid, platform_role="member", project_roles={"p1": "fde"})
+
+    def verify_project_access(self, user, project_id, action="read"):
+        return user.is_admin or project_id in user.project_roles
+
+    def login_routes(self):
+        return self._r
+
+
+set_auth_provider(Stub())  # 装配序：注入在前
+from src.main import app  # noqa: E402 —— app/login 路由装配在后（登录路由来自替换 provider）
+
+with TestClient(app) as c:
+    assert "stub-login-page" in c.get("/api/v1/auth/login").text  # 登录路由已换血
+    assert c.get("/api/v1/projects").status_code == 401
+    r = c.post("/api/v1/projects", json={"name": "P1"}, headers={"X-User": "boss"})
+    assert r.status_code == 200 and r.json()["project"]["owner_user_id"] == "boss"
+    pid = r.json()["project"]["id"]
+    assert c.get("/api/v1/projects", headers={"X-User": "alice"}).json()["total"] == 0
+    assert c.get("/api/v1/projects/" + pid, headers={"X-User": "alice"}).status_code == 403
+    assert c.get("/api/v1/projects/p1", headers={"X-User": "alice"}).status_code == 404
+print("ASSEMBLY-OK")
+"""

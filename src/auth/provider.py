@@ -30,6 +30,10 @@ class User:
 class AuthProvider(Protocol):
     """认证提供方接口（替换点）。实现方负责：用户识别、会话校验、项目访问判定、登录路由。"""
 
+    users_enabled: bool
+    """多用户档标记：True=存在真实用户体系（本地多用户/casdoor 等替换 provider——
+    CE 端点据此启用归属/过滤等多用户行为）；False=单用户直通（v0.4 行为）。"""
+
     def current_user(self, request) -> User:
         """从请求解析当前用户（未认证应抛 HTTPException 401）。"""
         ...

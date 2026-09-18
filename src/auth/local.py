@@ -360,6 +360,13 @@ class LocalAuthProvider:
         self._conn.execute("DELETE FROM project_members WHERE project_id=? AND user_id=?", (project_id, user_id))
         self._conn.commit()
 
+    # ---- 公开查询（供装配层/运营面；单用户档 no-op 防御） ----
+    def admin_needs_activation(self) -> bool:
+        """首个管理员是否尚未激活（仅本地多用户档有意义；单用户档恒 False）。"""
+        if not self.users_enabled:
+            return False
+        return self._admin_needs_activation()
+
     # ---- 内部 ----
     def _ensure_invite_table(self) -> None:
         self._conn.executescript(
