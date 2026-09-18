@@ -6,46 +6,57 @@
 <title>AI-FDE Engine 控制台</title>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <style>
+/* ===== 主题系统（v0.5.1：暗色默认/亮色可选，localStorage 持久化）===== */
+:root, :root[data-theme="dark"] {
+  --bg-page:#1a1e2a; --bg-side:#232838; --bg-card:#272d3d; --bg-hover:#2a3040; --bg-inset:#20242f;
+  --bd:#323a4e; --tx:#e8ecf4; --tx-sub:#b6bfce; --tx-weak:#9aa6ba; --tx-faint:#7e8aa0;
+  --accent:#6c8cff; --ok:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+}
+:root[data-theme="light"] {
+  --bg-page:#f4f6fa; --bg-side:#ffffff; --bg-card:#ffffff; --bg-hover:#eef1f7; --bg-inset:#f0f2f7;
+  --bd:#dde3ee; --tx:#1f2430; --tx-sub:#4a5265; --tx-weak:#6b7488; --tx-faint:#8a93a8;
+  --accent:#4a6cf7; --ok:#16a34a; --warn:#d97706; --bad:#dc2626;
+}
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1e2a; color: #e8ecf4; display: flex; min-height: 100vh; }
-.sidebar { width: 220px; background: #232838; border-right: 1px solid #323a4e; padding: 20px 0; position: fixed; height: 100vh; overflow-y: auto; }
-.sidebar .logo { padding: 0 20px 20px; font-size: 19px; font-weight: 700; color: #6c8cff; border-bottom: 1px solid #323a4e; margin-bottom: 10px; }
-.sidebar .logo span { color: #9aa6ba; font-size: 12.5px; font-weight: 400; display: block; margin-top: 2px; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-page); color: var(--tx); display: flex; min-height: 100vh; }
+.sidebar { width: 220px; background: var(--bg-side); border-right: 1px solid var(--bd); padding: 20px 0 0 0; position: fixed; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; }
+.sidebar .logo { padding: 0 20px 20px; font-size: 19px; font-weight: 700; color: var(--accent); border-bottom: 1px solid var(--bd); margin-bottom: 10px; }
+.sidebar .logo span { color: var(--tx-weak); font-size: 12.5px; font-weight: 400; display: block; margin-top: 2px; }
 .nav-item { padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 10px; font-size: 17px; color: #a4afc0; transition: all 0.2s; border-left: 3px solid transparent; }
-.nav-item:hover { background: #2a3040; color: #e8ecf4; }
-.nav-item.active { background: #2a3040; color: #6c8cff; border-left-color: #6c8cff; }
+.nav-item:hover { background: var(--bg-hover); color: var(--tx); }
+.nav-item.active { background: var(--bg-hover); color: var(--accent); border-left-color: var(--accent); }
 .nav-item .icon { width: 18px; text-align: center; }
 .main { margin-left: 220px; flex: 1; padding: 24px 32px; }
 .page { display: none; }
 .page.active { display: block; }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
 .page-header h1 { font-size: 22px; font-weight: 600; }
-.page-header .subtitle { color: #9aa6ba; font-size: 14.5px; margin-top: 4px; }
+.page-header .subtitle { color: var(--tx-weak); font-size: 14.5px; margin-top: 4px; }
 .btn { padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 14.5px; font-weight: 500; transition: all 0.2s; }
-.btn-primary { background: #6c8cff; color: #fff; }
+.btn-primary { background: var(--accent); color: #fff; }
 .btn-primary:hover { background: #5a7aee; }
-.btn-secondary { background: #323a4e; color: #ccd4e0; border: 1px solid #353848; }
+.btn-secondary { background: var(--bd); color: var(--tx-sub); border: 1px solid #353848; }
 .btn-secondary:hover { background: #2f3242; }
 .btn-success { background: #22c55e; color: #fff; }
 .btn-danger { background: #ef4444; color: #fff; }
 .btn-sm { padding: 4px 10px; font-size: 13.5px; }
 .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
-.card { background: #232838; border: 1px solid #323a4e; border-radius: 10px; padding: 18px; }
-.card .label { font-size: 13.5px; color: #9aa6ba; margin-bottom: 8px; }
+.card { background: var(--bg-side); border: 1px solid var(--bd); border-radius: 10px; padding: 18px; }
+.card .label { font-size: 13.5px; color: var(--tx-weak); margin-bottom: 8px; }
 .card .value { font-size: 28px; font-weight: 700; }
 .card .trend { font-size: 13.5px; margin-top: 6px; }
 .trend.up { color: #22c55e; }
 .trend.down { color: #ef4444; }
-.panel { background: #232838; border: 1px solid #323a4e; border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+.panel { background: var(--bg-side); border: 1px solid var(--bd); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
 .panel-title { font-size: 17px; font-weight: 600; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
 .panel-title .actions { display: flex; gap: 8px; }
 .chart { width: 100%; height: 300px; }
 table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
-th { text-align: left; padding: 10px 12px; color: #9aa6ba; font-weight: 500; border-bottom: 1px solid #323a4e; font-size: 13.5px; text-transform: uppercase; }
-td { padding: 12px; border-bottom: 1px solid #272d3d; }
+th { text-align: left; padding: 10px 12px; color: var(--tx-weak); font-weight: 500; border-bottom: 1px solid var(--bd); font-size: 13.5px; text-transform: uppercase; }
+td { padding: 12px; border-bottom: 1px solid var(--bg-card); }
 tr:hover { background: #1a1d2b; }
 .badge { padding: 3px 8px; border-radius: 4px; font-size: 12.5px; font-weight: 600; display: inline-block; }
-.badge-running { background: rgba(108,140,255,0.15); color: #6c8cff; }
+.badge-running { background: rgba(108,140,255,0.15); color: var(--accent); }
 .badge-completed { background: rgba(34,197,94,0.15); color: #22c55e; }
 .badge-failed { background: rgba(239,68,68,0.15); color: #ef4444; }
 .badge-pending { background: rgba(245,158,11,0.15); color: #f59e0b; }
@@ -53,43 +64,43 @@ tr:hover { background: #1a1d2b; }
 .badge-design { background: rgba(168,85,247,0.15); color: #c084fc; }
 .badge-delivery { background: rgba(34,197,94,0.15); color: #4ade80; }
 .badge-project { background: rgba(245,158,11,0.15); color: #fbbf24; }
-.progress-bar { height: 6px; background: #323a4e; border-radius: 3px; overflow: hidden; }
-.progress-fill { height: 100%; background: linear-gradient(90deg, #6c8cff, #8b5cf6); border-radius: 3px; transition: width 0.3s; }
+.progress-bar { height: 6px; background: var(--bd); border-radius: 3px; overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #8b5cf6); border-radius: 3px; transition: width 0.3s; }
 .steps { display: flex; gap: 0; margin: 16px 0; }
 .step { flex: 1; text-align: center; position: relative; }
-.step .dot { width: 32px; height: 32px; border-radius: 50%; background: #323a4e; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-size: 14.5px; font-weight: 600; color: #9aa6ba; position: relative; z-index: 1; }
+.step .dot { width: 32px; height: 32px; border-radius: 50%; background: var(--bd); margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; font-size: 14.5px; font-weight: 600; color: var(--tx-weak); position: relative; z-index: 1; }
 .step.completed .dot { background: #22c55e; color: #fff; }
-.step.active .dot { background: #6c8cff; color: #fff; box-shadow: 0 0 0 4px rgba(108,140,255,0.2); }
-.step .line { position: absolute; top: 16px; left: 50%; width: 100%; height: 2px; background: #323a4e; }
+.step.active .dot { background: var(--accent); color: #fff; box-shadow: 0 0 0 4px rgba(108,140,255,0.2); }
+.step .line { position: absolute; top: 16px; left: 50%; width: 100%; height: 2px; background: var(--bd); }
 .step.completed .line { background: #22c55e; }
-.step .label { font-size: 12.5px; color: #9aa6ba; }
-.step.active .label { color: #6c8cff; font-weight: 600; }
+.step .label { font-size: 12.5px; color: var(--tx-weak); }
+.step.active .label { color: var(--accent); font-weight: 600; }
 .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); z-index: 100; align-items: center; justify-content: center; }
 .modal-overlay.active { display: flex; }
-.modal { background: #232838; border: 1px solid #323a4e; border-radius: 12px; width: 800px; max-width: 90vw; max-height: 85vh; overflow-y: auto; }
-.modal-header { padding: 20px 24px; border-bottom: 1px solid #323a4e; display: flex; justify-content: space-between; align-items: center; }
+.modal { background: var(--bg-side); border: 1px solid var(--bd); border-radius: 12px; width: 800px; max-width: 90vw; max-height: 85vh; overflow-y: auto; }
+.modal-header { padding: 20px 24px; border-bottom: 1px solid var(--bd); display: flex; justify-content: space-between; align-items: center; }
 .modal-header h2 { font-size: 19px; }
-.modal-close { background: none; border: none; color: #9aa6ba; font-size: 21px; cursor: pointer; }
+.modal-close { background: none; border: none; color: var(--tx-weak); font-size: 21px; cursor: pointer; }
 .modal-body { padding: 24px; }
-.modal-footer { padding: 16px 24px; border-top: 1px solid #323a4e; display: flex; justify-content: flex-end; gap: 10px; }
+.modal-footer { padding: 16px 24px; border-top: 1px solid var(--bd); display: flex; justify-content: flex-end; gap: 10px; }
 .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-.detail-item .label { font-size: 13.5px; color: #9aa6ba; margin-bottom: 4px; }
+.detail-item .label { font-size: 13.5px; color: var(--tx-weak); margin-bottom: 4px; }
 .detail-item .value { font-size: 17px; font-weight: 500; }
-.tabs { display: flex; gap: 0; border-bottom: 1px solid #323a4e; margin-bottom: 16px; }
-.tab { padding: 10px 16px; cursor: pointer; font-size: 14.5px; color: #9aa6ba; border-bottom: 2px solid transparent; }
-.tab.active { color: #6c8cff; border-bottom-color: #6c8cff; }
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--bd); margin-bottom: 16px; }
+.tab { padding: 10px 16px; cursor: pointer; font-size: 14.5px; color: var(--tx-weak); border-bottom: 2px solid transparent; }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
-pre { background: #1a1e2a; border: 1px solid #323a4e; border-radius: 6px; padding: 12px; font-size: 13.5px; overflow-x: auto; max-height: 300px; overflow-y: auto; }
-.empty-state { text-align: center; padding: 40px; color: #7e8aa0; }
+pre { background: var(--bg-page); border: 1px solid var(--bd); border-radius: 6px; padding: 12px; font-size: 13.5px; overflow-x: auto; max-height: 300px; overflow-y: auto; }
+.empty-state { text-align: center; padding: 40px; color: var(--tx-faint); }
 .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
-.refresh-btn { cursor: pointer; color: #9aa6ba; font-size: 13.5px; }
-.refresh-btn:hover { color: #6c8cff; }
+.refresh-btn { cursor: pointer; color: var(--tx-weak); font-size: 13.5px; }
+.refresh-btn:hover { color: var(--accent); }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
 .status-dot.green { background: #22c55e; }
 .status-dot.yellow { background: #f59e0b; }
 .status-dot.red { background: #ef4444; }
-.status-dot.blue { background: #6c8cff; }
+.status-dot.blue { background: var(--accent); }
 @media (max-width: 768px) {
   .sidebar { width: 60px; }
   .sidebar .logo span, .nav-item span { display: none; }
@@ -113,6 +124,8 @@ pre { background: #1a1e2a; border: 1px solid #323a4e; border-radius: 6px; paddin
   <div class="nav-item" data-page="selfservice"><span class="icon">🤝</span><span>自助交付</span></div>
   <div class="nav-item" data-page="memoryhub"><span class="icon">🧠</span><span>经验库</span></div>
   <div class="nav-item" data-page="api"><span class="icon">🔌</span><span>API文档</span></div>
+  <div id="theme-toggle" onclick="toggleTheme()" style="margin-top:auto;padding:12px 20px;cursor:pointer;display:flex;align-items:center;gap:10px;font-size:15px;color:var(--tx-weak);border-top:1px solid var(--bd);"><span class="icon" id="theme-icon">🌙</span><span id="theme-label">亮色模式</span></div>
+  <div id="user-box" style="padding:12px 20px;font-size:13.5px;color:var(--tx-faint);border-top:1px solid var(--bd);"></div>
 </div>
 
 <div class="main">
@@ -126,11 +139,16 @@ pre { background: #1a1e2a; border: 1px solid #323a4e; border-radius: 6px; paddin
 
   <!-- 总览页 -->
   <div class="page active" id="page-overview">
+    <div class="panel" id="value-flow-panel" style="margin-bottom:20px;">
+      <div class="panel-title">八步价值流 · 用户需求 → 软件产品/解决方案 <span id="value-flow-proj" style="color:var(--tx-faint);font-weight:400;font-size:13.5px;margin-left:8px;"></span></div>
+      <div id="value-flow" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;"></div>
+      <div style="color:var(--tx-faint);font-size:12.5px;margin-top:8px;">步骤高亮=最新活跃项目已达成；点击跳转对应界面。全流程指引见 docs/28 号。</div>
+    </div>
     <div class="page-header">
       <div><h1>交付总览</h1><div class="subtitle">AI驱动的FDE全流程交付监控</div></div>
       <div style="display:flex;gap:10px;align-items:center;">
         <span class="refresh-btn" onclick="loadOverview()">🔄 刷新</span>
-        <span id="health-status" style="font-size:12px;color:#9aa6ba;"></span>
+        <span id="health-status" style="font-size:12px;color:var(--tx-weak);"></span>
       </div>
     </div>
     <div class="cards" id="overview-cards"></div>
@@ -147,6 +165,14 @@ pre { background: #1a1e2a; border: 1px solid #323a4e; border-radius: 6px; paddin
     <div class="panel">
       <div class="panel-title">最近活动</div>
       <div id="recent-activity"><div class="empty-state"><div class="icon">📋</div>暂无活动记录</div></div>
+      <div class="panel" id="team-panel" style="display:none;">
+        <div class="panel-title">团队（本地多用户）</div>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <button class="btn btn-primary btn-sm" onclick="genInvite()">生成邀请码</button>
+          <span id="invite-code-box" style="color:var(--tx);font-family:monospace;font-size:15px;"></span>
+          <span style="color:var(--tx-faint);font-size:12.5px;">新用户凭邀请码在登录页激活</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -239,21 +265,22 @@ pre { background: #1a1e2a; border: 1px solid #323a4e; border-radius: 6px; paddin
       <span class="refresh-btn" onclick="loadKnowledge()">🔄 刷新</span>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;">
-      <select id="kb-project" onchange="loadKnowledge()" style="padding:8px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;"></select>
+      <select id="kb-project" onchange="loadKnowledge()" style="padding:8px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);"></select>
       <button class="btn btn-primary btn-sm" onclick="kbRebuild()">重建索引</button>
     </div>
     <div class="cards" id="kb-stats-cards"></div>
     <div class="panel">
       <div class="panel-title">语义检索（q + top-k，命中含出处）</div>
       <div style="display:flex;gap:10px;margin-bottom:12px;">
-        <input id="kb-query" placeholder="输入检索词，如：特采放行流程" style="flex:1;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;" onkeydown="if(event.key==='Enter')kbSearch()">
-        <input id="kb-topk" type="number" value="5" min="1" max="20" style="width:70px;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;">
+        <input id="kb-query" placeholder="输入检索词，如：特采放行流程" style="flex:1;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);" onkeydown="if(event.key==='Enter')kbSearch()">
+        <input id="kb-topk" type="number" value="5" min="1" max="20" style="width:70px;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);">
         <button class="btn btn-primary" onclick="kbSearch()">检索</button>
       </div>
       <div id="kb-search-results"><div class="empty-state"><div class="icon">🔍</div>输入关键词检索项目知识</div></div>
     </div>
     <div class="panel">
-      <div class="panel-title">待确认知识条目（badcase 闭环 / 人工 curate → confirm 后加权生效）</div>
+      <div class="panel-title">待确认知识条目（badcase 闭环 / 人工 curate → confirm 后加权生效）
+        <button class="btn btn-sm" style="float:right;background:var(--accent);color:#fff;border:none;" onclick="kbConfirmAll()">✓ 全部确认本页</button></div>
       <div id="kb-pending-queue"><div class="empty-state">选择项目后加载</div></div>
     </div>
   </div>
@@ -265,19 +292,19 @@ pre { background: #1a1e2a; border: 1px solid #323a4e; border-radius: 6px; paddin
       <span class="refresh-btn" onclick="loadOntology()">🔄 刷新</span>
     </div>
     <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center;">
-      <select id="onto-project" onchange="loadOntology()" style="padding:8px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;"></select>
+      <select id="onto-project" onchange="loadOntology()" style="padding:8px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);"></select>
       <button class="btn btn-primary btn-sm" onclick="ontoExtract(false)">增量抽取</button>
-      <button class="btn btn-sm" onclick="ontoExtract(true)" style="background:#2a3040;color:#e8ecf4;border:1px solid #323a4e;">强制重抽</button>
+      <button class="btn btn-sm" onclick="ontoExtract(true)" style="background:var(--bg-hover);color:var(--tx);border:1px solid var(--bd);">强制重抽</button>
     </div>
     <div class="cards" id="onto-stats-cards"></div>
     <div class="panel">
       <div class="panel-title">业务关系图（Mermaid）</div>
-      <div id="onto-mermaid" style="overflow:auto;background:#20242f;border-radius:8px;padding:12px;min-height:200px;"><div class="empty-state">抽取后渲染</div></div>
+      <div id="onto-mermaid" style="overflow:auto;background:var(--bg-inset);border-radius:8px;padding:12px;min-height:200px;"><div class="empty-state">抽取后渲染</div></div>
     </div>
     <div class="panel">
       <div class="panel-title">实体管理（幻觉实体可人工删除）</div>
       <div style="display:flex;gap:10px;margin-bottom:12px;">
-        <input id="onto-entity-q" placeholder="按名称/类型搜索实体" style="flex:1;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;" onkeydown="if(event.key==='Enter')ontoSearch()">
+        <input id="onto-entity-q" placeholder="按名称/类型搜索实体" style="flex:1;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);" onkeydown="if(event.key==='Enter')ontoSearch()">
         <button class="btn btn-primary" onclick="ontoSearch()">搜索</button>
       </div>
       <div id="onto-entity-list"><div class="empty-state">搜索或抽取后显示</div></div>
@@ -292,7 +319,7 @@ pre { background: #1a1e2a; border: 1px solid #323a4e; border-radius: 6px; paddin
     <div class="panel">
       <div class="panel-title">🔍 跨项目经验检索</div>
       <div style="display:flex;gap:10px;margin:10px 0;">
-        <input id="mh-query" placeholder="例如：特采放行怎么处理的？ / 客户数据接入踩过什么坑？" style="flex:1;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;">
+        <input id="mh-query" placeholder="例如：特采放行怎么处理的？ / 客户数据接入踩过什么坑？" style="flex:1;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);">
         <button class="btn btn-primary" onclick="searchGlobalMemory()">检索</button>
       </div>
       <div id="mh-results"><div class="empty-state">输入关键词，检索所有项目沉淀的经验/决策/教训</div></div>
@@ -300,7 +327,7 @@ pre { background: #1a1e2a; border: 1px solid #323a4e; border-radius: 6px; paddin
     <div class="panel" style="margin-top:20px;">
       <div class="panel-title">📋 项目复盘</div>
       <div style="display:flex;gap:10px;margin:10px 0;align-items:center;">
-        <select id="mh-project" style="flex:1;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;"></select>
+        <select id="mh-project" style="flex:1;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);"></select>
         <button class="btn btn-primary" onclick="loadRetrospective()">生成复盘报告</button>
       </div>
       <div id="mh-retro"><div class="empty-state">选择项目 → 一键生成交付复盘（执行概况/质量处理/经验沉淀清单）</div></div>
@@ -316,7 +343,7 @@ pre { background: #1a1e2a; border: 1px solid #323a4e; border-radius: 6px; paddin
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
       <div class="panel">
         <div class="panel-title">模式一：交互式调用（同步/异步API）</div>
-        <p style="font-size:13px;color:#b6bfce;margin-bottom:12px;">前端工具、IDE插件、聊天界面直接调用API，实时获取结果。</p>
+        <p style="font-size:13px;color:var(--tx-sub);margin-bottom:12px;">前端工具、IDE插件、聊天界面直接调用API，实时获取结果。</p>
         <pre style="font-size:11px;"># 创建项目
 POST /api/v1/projects
 {"name":"智能客服项目","industry":"电商"}
@@ -339,7 +366,7 @@ POST /api/v1/projects/{id}/self-service/prototype</pre>
       </div>
       <div class="panel">
         <div class="panel-title">模式二：后台异步流水线</div>
-        <p style="font-size:13px;color:#b6bfce;margin-bottom:12px;">提交需求后，Agent在后台自动完成全流程，完成后通知人工审核。</p>
+        <p style="font-size:13px;color:var(--tx-sub);margin-bottom:12px;">提交需求后，Agent在后台自动完成全流程，完成后通知人工审核。</p>
         <pre style="font-size:11px;"># 1. 提交项目需求（交互完成）
 POST /api/v1/projects
 POST /api/v1/projects/{id}/documents (上传资料)
@@ -404,10 +431,10 @@ POST /api/v1/self-service/review/{id}/action
   <div class="modal" style="width:500px;">
     <div class="modal-header"><h2>新建项目</h2><button class="modal-close" onclick="closeModal('create-modal')">×</button></div>
     <div class="modal-body">
-      <div style="margin-bottom:16px;"><label style="font-size:13px;color:#b6bfce;display:block;margin-bottom:6px;">项目名称</label><input id="new-project-name" style="width:100%;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;font-size:14px;" placeholder="如：智能客服AI落地项目"></div>
-      <div style="margin-bottom:16px;"><label style="font-size:13px;color:#b6bfce;display:block;margin-bottom:6px;">客户名称</label><input id="new-project-client" style="width:100%;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;font-size:14px;" placeholder="如：某某电商公司"></div>
-      <div style="margin-bottom:16px;"><label style="font-size:13px;color:#b6bfce;display:block;margin-bottom:6px;">行业</label><input id="new-project-industry" style="width:100%;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;font-size:14px;" placeholder="如：电子商务"></div>
-      <div><label style="font-size:13px;color:#b6bfce;display:block;margin-bottom:6px;">项目描述</label><textarea id="new-project-desc" rows="3" style="width:100%;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;font-size:14px;resize:vertical;" placeholder="简要描述项目目标和范围"></textarea></div>
+      <div style="margin-bottom:16px;"><label style="font-size:13px;color:var(--tx-sub);display:block;margin-bottom:6px;">项目名称</label><input id="new-project-name" style="width:100%;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;" placeholder="如：智能客服AI落地项目"></div>
+      <div style="margin-bottom:16px;"><label style="font-size:13px;color:var(--tx-sub);display:block;margin-bottom:6px;">客户名称</label><input id="new-project-client" style="width:100%;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;" placeholder="如：某某电商公司"></div>
+      <div style="margin-bottom:16px;"><label style="font-size:13px;color:var(--tx-sub);display:block;margin-bottom:6px;">行业</label><input id="new-project-industry" style="width:100%;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;" placeholder="如：电子商务"></div>
+      <div><label style="font-size:13px;color:var(--tx-sub);display:block;margin-bottom:6px;">项目描述</label><textarea id="new-project-desc" rows="3" style="width:100%;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;resize:vertical;" placeholder="简要描述项目目标和范围"></textarea></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('create-modal')">取消</button>
@@ -421,17 +448,17 @@ POST /api/v1/self-service/review/{id}/action
   <div class="modal" style="width:520px;">
     <div class="modal-header"><h2>提交 Badcase</h2><button class="modal-close" onclick="closeModal('badcase-modal')">×</button></div>
     <div class="modal-body">
-      <div style="margin-bottom:12px;font-size:12px;color:#9aa6ba;">10 秒提交一条坏例。夜间迭代将自动归因，可自动修复或生成修复建议供您采纳。</div>
-      <div style="margin-bottom:12px;"><label style="font-size:13px;color:#b6bfce;display:block;margin-bottom:6px;">项目</label>
-        <select id="badcase-project" style="width:100%;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;font-size:14px;"></select></div>
-      <div style="margin-bottom:12px;"><label style="font-size:13px;color:#b6bfce;display:block;margin-bottom:6px;">用户输入</label>
-        <input id="badcase-input" style="width:100%;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;font-size:14px;" placeholder="客户/用户实际问了什么"></div>
-      <div style="margin-bottom:12px;"><label style="font-size:13px;color:#b6bfce;display:block;margin-bottom:6px;">实际输出（错误）</label>
-        <input id="badcase-actual" style="width:100%;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;font-size:14px;" placeholder="系统答错了什么"></div>
-      <div style="margin-bottom:12px;"><label style="font-size:13px;color:#b6bfce;display:block;margin-bottom:6px;">期望输出</label>
-        <input id="badcase-expected" style="width:100%;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;font-size:14px;" placeholder="正确答案应该是什么"></div>
-      <div style="margin-bottom:8px;"><label style="font-size:13px;color:#b6bfce;display:block;margin-bottom:6px;">错误类型</label>
-        <select id="badcase-type" style="width:100%;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;font-size:14px;">
+      <div style="margin-bottom:12px;font-size:12px;color:var(--tx-weak);">10 秒提交一条坏例。夜间迭代将自动归因，可自动修复或生成修复建议供您采纳。</div>
+      <div style="margin-bottom:12px;"><label style="font-size:13px;color:var(--tx-sub);display:block;margin-bottom:6px;">项目</label>
+        <select id="badcase-project" style="width:100%;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;"></select></div>
+      <div style="margin-bottom:12px;"><label style="font-size:13px;color:var(--tx-sub);display:block;margin-bottom:6px;">用户输入</label>
+        <input id="badcase-input" style="width:100%;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;" placeholder="客户/用户实际问了什么"></div>
+      <div style="margin-bottom:12px;"><label style="font-size:13px;color:var(--tx-sub);display:block;margin-bottom:6px;">实际输出（错误）</label>
+        <input id="badcase-actual" style="width:100%;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;" placeholder="系统答错了什么"></div>
+      <div style="margin-bottom:12px;"><label style="font-size:13px;color:var(--tx-sub);display:block;margin-bottom:6px;">期望输出</label>
+        <input id="badcase-expected" style="width:100%;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;" placeholder="正确答案应该是什么"></div>
+      <div style="margin-bottom:8px;"><label style="font-size:13px;color:var(--tx-sub);display:block;margin-bottom:6px;">错误类型</label>
+        <select id="badcase-type" style="width:100%;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;">
           <option value="knowledge">知识缺失（该答的没答上）</option>
           <option value="prompt">格式/表述问题</option>
           <option value="rule">业务规则冲突</option>
@@ -449,17 +476,17 @@ POST /api/v1/self-service/review/{id}/action
   <div class="modal" style="width:480px;">
     <div class="modal-header"><h2>LLM 配置</h2><button class="modal-close" onclick="closeModal('settings-modal')">×</button></div>
     <div class="modal-body">
-      <div style="margin-bottom:12px;font-size:12px;color:#9aa6ba;">配置 API Key 后立即切换真实模式（保存即热生效，无需重启）。Key 仅存于本地 data/settings.json。</div>
-      <div style="margin-bottom:16px;"><label style="font-size:13px;color:#b6bfce;display:block;margin-bottom:6px;">Provider</label>
-        <select id="llm-provider" style="width:100%;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;font-size:14px;">
+      <div style="margin-bottom:12px;font-size:12px;color:var(--tx-weak);">配置 API Key 后立即切换真实模式（保存即热生效，无需重启）。Key 仅存于本地 data/settings.json。</div>
+      <div style="margin-bottom:16px;"><label style="font-size:13px;color:var(--tx-sub);display:block;margin-bottom:6px;">Provider</label>
+        <select id="llm-provider" style="width:100%;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;">
           <option value="deepseek">DeepSeek（推荐）</option>
           <option value="qwen">Qwen（通义千问）</option>
         </select></div>
-      <div style="margin-bottom:16px;"><label style="font-size:13px;color:#b6bfce;display:block;margin-bottom:6px;">API Key</label>
-        <input id="llm-api-key" type="password" style="width:100%;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;font-size:14px;" placeholder="sk-..."></div>
-      <div style="margin-bottom:8px;"><label style="font-size:13px;color:#b6bfce;display:block;margin-bottom:6px;">Base URL（可选，默认官方地址）</label>
-        <input id="llm-base-url" style="width:100%;padding:10px;background:#1a1e2a;border:1px solid #323a4e;border-radius:6px;color:#e8ecf4;font-size:14px;" placeholder="https://api.deepseek.com/v1"></div>
-      <div id="llm-current" style="font-size:12px;color:#9aa6ba;margin-top:12px;"></div>
+      <div style="margin-bottom:16px;"><label style="font-size:13px;color:var(--tx-sub);display:block;margin-bottom:6px;">API Key</label>
+        <input id="llm-api-key" type="password" style="width:100%;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;" placeholder="sk-..."></div>
+      <div style="margin-bottom:8px;"><label style="font-size:13px;color:var(--tx-sub);display:block;margin-bottom:6px;">Base URL（可选，默认官方地址）</label>
+        <input id="llm-base-url" style="width:100%;padding:10px;background:var(--bg-page);border:1px solid var(--bd);border-radius:6px;color:var(--tx);font-size:14px;" placeholder="https://api.deepseek.com/v1"></div>
+      <div id="llm-current" style="font-size:12px;color:var(--tx-weak);margin-top:12px;"></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeModal('settings-modal')">取消</button>
@@ -490,13 +517,13 @@ async function searchGlobalMemory() {
   try {
     const data = await api(`/memory/global/search?query=${encodeURIComponent(q)}`);
     el.innerHTML = (data.results || []).length
-      ? data.results.map(m => `<div style="padding:10px 0;border-bottom:1px solid #272d3d;">
+      ? data.results.map(m => `<div style="padding:10px 0;border-bottom:1px solid var(--bg-card);">
           <div style="display:flex;justify-content:space-between;">
             <span class="badge badge-${m.memory_type}">${m.memory_type}</span>
-            <span style="color:#7e8aa0;font-size:12px;">📦 ${m.project_name || m.project_id?.slice(0,8)}</span>
+            <span style="color:var(--tx-faint);font-size:12px;">📦 ${m.project_name || m.project_id?.slice(0,8)}</span>
           </div>
           <div style="margin-top:4px;font-size:13px;">${(m.content || '').slice(0, 160)}</div>
-        </div>`).join('') + `<div style="color:#7e8aa0;font-size:12px;margin-top:8px;">命中 ${data.total} 条 · 检索 ${data.projects_searched} 个项目</div>`
+        </div>`).join('') + `<div style="color:var(--tx-faint);font-size:12px;margin-top:8px;">命中 ${data.total} 条 · 检索 ${data.projects_searched} 个项目</div>`
       : '<div class="empty-state">无命中——本项目群还没有相关沉淀</div>';
   } catch (e) { el.innerHTML = '<div class="empty-state">检索失败：' + e.message + '</div>'; }
 }
@@ -512,7 +539,7 @@ async function loadRetrospective() {
       el.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
           <button class="btn btn-secondary btn-sm" onclick="downloadRetro('${pid}')">⬇️ 下载 markdown</button>
         </div>
-        <pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;color:#ccd4e0;max-height:420px;overflow:auto;">${data.markdown.replace(/</g, '&lt;')}</pre>`;
+        <pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;color:var(--tx-sub);max-height:420px;overflow:auto;">${data.markdown.replace(/</g, '&lt;')}</pre>`;
     }
   } catch (e) { el.innerHTML = '<div class="empty-state">生成失败：' + e.message + '</div>'; }
 }
@@ -566,7 +593,7 @@ async function loadBadcaseList() {
     const data = await api(`/projects/${pid}/badcases`);
     const el = document.getElementById('badcase-list');
     el.innerHTML = (data.badcases || []).length
-      ? data.badcases.map(b => `<div style="padding:8px 0;border-bottom:1px solid #272d3d;font-size:13px;">
+      ? data.badcases.map(b => `<div style="padding:8px 0;border-bottom:1px solid var(--bg-card);font-size:13px;">
           <span class="badge badge-${b.status === 'open' ? 'running' : 'completed'}">${b.status === 'open' ? '待处理' : '已处理'}</span>
           <b style="margin:0 8px;">[${b.error_type || '-'}]</b>${(b.input || '').slice(0, 60)}
         </div>`).join('')
@@ -619,6 +646,46 @@ async function saveLLMSettings() {
 }
 // ===== LLM 配置 END =====
 
+// ===== 主题系统 =====
+function applyTheme(th) {
+  document.documentElement.setAttribute('data-theme', th);
+  localStorage.setItem('aifde-theme', th);
+  document.getElementById('theme-icon').textContent = th === 'dark' ? '🌙' : '☀️';
+  document.getElementById('theme-label').textContent = th === 'dark' ? '亮色模式' : '暗色模式';
+  // 图表与本体图跟随重绘
+  const active = document.querySelector('.page.active')?.id || '';
+  if (active === 'page-overview') loadOverview();
+  if (active === 'page-ontology') { const pid = document.getElementById('onto-project')?.value; if (pid) renderOntoMermaid(pid); }
+}
+function toggleTheme() {
+  applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+}
+applyTheme(localStorage.getItem('aifde-theme') || 'dark');
+
+// ===== 用户菜单（多用户档显示当前用户+登出）=====
+async function loadUserBox() {
+  const box = document.getElementById('user-box');
+  try {
+    const r = await fetch(API + '/auth/me');
+    if (!r.ok) { box.innerHTML = ''; return; }
+    const j = await r.json();
+    if (j.user && j.user.id !== 'local-admin') {
+      box.innerHTML = `<div>👤 ${j.user.display_name}（${j.user.platform_role}）</div>
+        <div style="margin-top:6px;"><a href="#" onclick="doLogout();return false" style="color:var(--accent);">退出登录</a></div>`;
+    } else { box.innerHTML = '👤 本地单用户'; }
+  } catch (e) { box.innerHTML = ''; }
+}
+async function genInvite() {
+  const r = await api('/auth/invites', { method: 'POST' });
+  document.getElementById('invite-code-box').textContent = r.invite_code || r.detail?.message || '生成失败';
+}
+
+async function doLogout() {
+  await api('/auth/logout', { method: 'POST' });
+  location.href = '/api/v1/auth/login';
+}
+loadUserBox();
+
 // 导航
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', () => {
@@ -646,6 +713,48 @@ async function api(path, options = {}) {
 }
 
 // 总览
+function cssVar(name, fallback) {
+  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return v || (fallback || '#888');
+}
+
+const VF_STEPS = [
+  { key: 'create',  icon: '①', label: '建项目',   page: 'projects',    done: p => !!p },
+  { key: 'upload',  icon: '②', label: '传材料',   page: 'projects',    done: d => (d.doc_count || d.kb_docs || 0) > 0 },
+  { key: 'research',icon: '③', label: '调研基线', page: 'tasks',       done: d => !!(d.requirements_baseline && d.requirements_baseline.summary) },
+  { key: 'review',  icon: '④', label: '审基线',   page: 'review',      done: d => ['designing', 'delivering', 'completed', 'reviewed'].includes(d.status) || !!(d.requirements_baseline && d.requirements_baseline.version && d.requirements_baseline.version !== 'v1.0') },
+  { key: 'design',  icon: '⑤', label: '方案设计', page: 'tasks',       done: d => !!(d.solutions && d.solutions.tech_solution) },
+  { key: 'bench',   icon: '⑥', label: '验收用例', page: 'quality',     done: d => !!(d.benchmark && d.benchmark.test_cases && d.benchmark.test_cases.length) },
+  { key: 'build',   icon: '⑦', label: '实现交付', page: 'projects',    done: d => ['delivering', 'completed'].includes(d.status) },
+  { key: 'asset',   icon: '⑧', label: '复盘沉淀', page: 'memoryhub',   done: d => d.status === 'completed' },
+];
+
+async function renderValueFlow(projList) {
+  const box = document.getElementById('value-flow');
+  const projTag = document.getElementById('value-flow-proj');
+  if (!projList.length) {
+    box.innerHTML = '<span style="color:var(--tx-weak);font-size:14.5px;">尚无项目——从「① 建项目」开始你的第一次价值交付</span>';
+    projTag.textContent = '';
+    return;
+  }
+  const p = projList.find(x => x.status !== 'completed') || projList[0];
+  projTag.textContent = `（跟踪：${p.name}）`;
+  let detail = {};
+  try { detail = (await api(`/projects/${p.id}`)).project || p; } catch (e) { detail = p; }
+  const kb = await api(`/projects/${p.id}/kb/stats`).catch(() => null) || {};
+  detail.kb_docs = (kb.stats || {}).documents || 0;
+  detail.doc_count = (detail.documents || []).length || detail.kb_docs;
+  const order = ['researching', 'designing', 'delivering', 'completed'];
+  detail.status = detail.status || 'researching';
+  box.innerHTML = VF_STEPS.map(s => {
+    const ok = s.done(detail);
+    return `<span onclick="location.hash='';document.querySelector('.nav-item[data-page=${s.page}]').click();"
+      style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:18px;font-size:14px;
+      border:1px solid ${ok ? 'var(--accent)' : 'var(--bd)'};background:${ok ? 'var(--accent)' : 'transparent'};
+      color:${ok ? '#fff' : 'var(--tx-sub)'};font-weight:${ok ? 600 : 400};">${s.icon} ${s.label} ${ok ? '✓' : ''}</span>`;
+  }).join('<span style="color:var(--tx-faint);">→</span>');
+}
+
 async function loadOverview() {
   const health = await api('/health');
   document.getElementById('health-status').innerHTML = health.status === 'healthy' ? '<span class="status-dot green"></span>服务正常' : '<span class="status-dot red"></span>服务异常';
@@ -655,15 +764,16 @@ async function loadOverview() {
   const completed = projList.filter(p => p.status === 'completed').length;
   document.getElementById('overview-cards').innerHTML = `
     <div class="card"><div class="label">项目总数</div><div class="value">${projList.length}</div><div class="trend up">↑ 活跃 ${running}</div></div>
-    <div class="card"><div class="label">进行中</div><div class="value" style="color:#6c8cff;">${running}</div><div class="trend">调研/设计阶段</div></div>
+    <div class="card"><div class="label">进行中</div><div class="value" style="color:var(--accent);">${running}</div><div class="trend">调研/设计阶段</div></div>
     <div class="card"><div class="label">已完成</div><div class="value" style="color:#22c55e;">${completed}</div><div class="trend up">交付完成</div></div>
     <div class="card"><div class="label">API端点</div><div class="value">38</div><div class="trend">REST + 异步</div></div>
   `;
   renderProjectChart(projList);
   renderAgentChart();
+  renderValueFlow(projList);
   // 最近活动
   const tasks = await api('/projects'); // 简化：用项目作为活动
-  const activity = projList.slice(0,5).map(p => `<div style="padding:10px 0;border-bottom:1px solid #272d3d;display:flex;justify-content:space-between;"><span><span class="badge badge-${p.status === 'completed' ? 'completed' : 'running'}">${p.status}</span> ${p.name}</span><span style="color:#7e8aa0;font-size:12px;">${p.industry || '-'}</span></div>`).join('');
+  const activity = projList.slice(0,5).map(p => `<div style="padding:10px 0;border-bottom:1px solid var(--bg-card);display:flex;justify-content:space-between;"><span><span class="badge badge-${p.status === 'completed' ? 'completed' : 'running'}">${p.status}</span> ${p.name}</span><span style="color:var(--tx-faint);font-size:12px;">${p.industry || '-'}</span></div>`).join('');
   document.getElementById('recent-activity').innerHTML = activity || '<div class="empty-state"><div class="icon">📋</div>暂无活动记录</div>';
 }
 
@@ -673,11 +783,11 @@ function renderProjectChart(projects) {
   const chart = echarts.init(document.getElementById('chart-project-status'));
   chart.setOption({
     tooltip: { trigger: 'item' },
-    legend: { bottom: 0, textStyle: { color: '#9aa6ba' } },
+    legend: { bottom: 0, textStyle: { color: cssVar('--tx-weak') } },
     series: [{ type: 'pie', radius: ['40%','70%'], center: ['50%','45%'],
       data: Object.entries(statusCount).map(([k,v]) => ({ name:k, value:v })),
-      itemStyle: { borderColor: '#232838', borderWidth: 2 },
-      label: { color: '#b6bfce' }
+      itemStyle: { borderColor: cssVar('--bg-side'), borderWidth: 2 },
+      label: { color: cssVar('--tx-sub') }
     }]
   });
   charts.projectStatus = chart;
@@ -688,9 +798,9 @@ function renderAgentChart() {
   chart.setOption({
     tooltip: { trigger: 'axis' },
     grid: { left: 60, right: 20, top: 20, bottom: 30 },
-    xAxis: { type: 'category', data: ['调研','设计','交付','项目','自助'], axisLabel: { color: '#9aa6ba' } },
-    yAxis: { type: 'value', axisLabel: { color: '#9aa6ba' }, splitLine: { lineStyle: { color: '#323a4e' } } },
-    series: [{ type: 'bar', data: [12, 8, 15, 6, 9], itemStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:'#6c8cff'},{offset:1,color:'#8b5cf6'}]), borderRadius: [4,4,0,0] } }]
+    xAxis: { type: 'category', data: ['调研','设计','交付','项目','自助'], axisLabel: { color: cssVar('--tx-weak') } },
+    yAxis: { type: 'value', axisLabel: { color: cssVar('--tx-weak') }, splitLine: { lineStyle: { color: cssVar('--bd') } } },
+    series: [{ type: 'bar', data: [12, 8, 15, 6, 9], itemStyle: { color: new echarts.graphic.LinearGradient(0,0,0,1,[{offset:0,color:cssVar('--accent')},{offset:1,color:'#8b5cf6'}]), borderRadius: [4,4,0,0] } }]
   });
   charts.agentTypes = chart;
 }
@@ -701,7 +811,7 @@ async function loadProjects() {
   const projects = data.projects || [];
   document.getElementById('projects-tbody').innerHTML = projects.map(p => `
     <tr>
-      <td style="font-weight:500;cursor:pointer;color:#6c8cff;" onclick="showProjectDetail('${p.id}')">${p.name}</td>
+      <td style="font-weight:500;cursor:pointer;color:var(--accent);" onclick="showProjectDetail('${p.id}')">${p.name}</td>
       <td>${p.client_name || '-'}</td>
       <td>${p.industry || '-'}</td>
       <td><span class="badge badge-${p.status === 'completed' ? 'completed' : 'running'}">${p.status}</span></td>
@@ -731,13 +841,13 @@ async function searchGlobalMemory() {
   try {
     const data = await api(`/memory/global/search?query=${encodeURIComponent(q)}`);
     el.innerHTML = (data.results || []).length
-      ? data.results.map(m => `<div style="padding:10px 0;border-bottom:1px solid #272d3d;">
+      ? data.results.map(m => `<div style="padding:10px 0;border-bottom:1px solid var(--bg-card);">
           <div style="display:flex;justify-content:space-between;">
             <span class="badge badge-${m.memory_type}">${m.memory_type}</span>
-            <span style="color:#7e8aa0;font-size:12px;">📦 ${m.project_name || m.project_id?.slice(0,8)}</span>
+            <span style="color:var(--tx-faint);font-size:12px;">📦 ${m.project_name || m.project_id?.slice(0,8)}</span>
           </div>
           <div style="margin-top:4px;font-size:13px;">${(m.content || '').slice(0, 160)}</div>
-        </div>`).join('') + `<div style="color:#7e8aa0;font-size:12px;margin-top:8px;">命中 ${data.total} 条 · 检索 ${data.projects_searched} 个项目</div>`
+        </div>`).join('') + `<div style="color:var(--tx-faint);font-size:12px;margin-top:8px;">命中 ${data.total} 条 · 检索 ${data.projects_searched} 个项目</div>`
       : '<div class="empty-state">无命中——本项目群还没有相关沉淀</div>';
   } catch (e) { el.innerHTML = '<div class="empty-state">检索失败：' + e.message + '</div>'; }
 }
@@ -753,7 +863,7 @@ async function loadRetrospective() {
       el.innerHTML = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
           <button class="btn btn-secondary btn-sm" onclick="downloadRetro('${pid}')">⬇️ 下载 markdown</button>
         </div>
-        <pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;color:#ccd4e0;max-height:420px;overflow:auto;">${data.markdown.replace(/</g, '&lt;')}</pre>`;
+        <pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;color:var(--tx-sub);max-height:420px;overflow:auto;">${data.markdown.replace(/</g, '&lt;')}</pre>`;
     }
   } catch (e) { el.innerHTML = '<div class="empty-state">生成失败：' + e.message + '</div>'; }
 }
@@ -801,11 +911,11 @@ async function showProjectDetail(projectId) {  currentProjectId = projectId;
   document.getElementById('project-modal').classList.add('active');
   // 加载子数据
   const tasks = await api(`/projects/${projectId}/tasks`);
-  document.getElementById('project-tasks-list').innerHTML = (tasks.tasks || []).map(t => `<div style="padding:8px 0;border-bottom:1px solid #272d3d;display:flex;justify-content:space-between;"><span><span class="badge badge-${t.type}">${t.type}</span> ${t.task_id?.slice(0,8) || ''}</span><span class="badge badge-${t.status}">${t.status}</span></div>`).join('') || '<div class="empty-state">暂无任务</div>';
+  document.getElementById('project-tasks-list').innerHTML = (tasks.tasks || []).map(t => `<div style="padding:8px 0;border-bottom:1px solid var(--bg-card);display:flex;justify-content:space-between;"><span><span class="badge badge-${t.type}">${t.type}</span> ${t.task_id?.slice(0,8) || ''}</span><span class="badge badge-${t.status}">${t.status}</span></div>`).join('') || '<div class="empty-state">暂无任务</div>';
   const docs = await api(`/projects/${projectId}/documents`);
-  document.getElementById('project-docs-list').innerHTML = (docs.documents || []).map(d => `<div style="padding:8px 0;border-bottom:1px solid #272d3d;">📄 ${d.filename || d.name} <span style="color:#7e8aa0;font-size:12px;margin-left:8px;">${d.size || ''}</span></div>`).join('') || '<div class="empty-state">暂无文档</div>';
+  document.getElementById('project-docs-list').innerHTML = (docs.documents || []).map(d => `<div style="padding:8px 0;border-bottom:1px solid var(--bg-card);">📄 ${d.filename || d.name} <span style="color:var(--tx-faint);font-size:12px;margin-left:8px;">${d.size || ''}</span></div>`).join('') || '<div class="empty-state">暂无文档</div>';
   const bench = await api(`/projects/${projectId}/benchmarks`);
-  document.getElementById('project-benchmarks-list').innerHTML = (bench.benchmarks || []).map(b => `<div style="padding:8px 0;border-bottom:1px solid #272d3d;">📊 ${b.name || b.benchmark_id} <span style="color:#7e8aa0;font-size:12px;margin-left:8px;">${b.case_count || 0}条用例</span></div>`).join('') || '<div class="empty-state">暂无Benchmark</div>';
+  document.getElementById('project-benchmarks-list').innerHTML = (bench.benchmarks || []).map(b => `<div style="padding:8px 0;border-bottom:1px solid var(--bg-card);">📊 ${b.name || b.benchmark_id} <span style="color:var(--tx-faint);font-size:12px;margin-left:8px;">${b.case_count || 0}条用例</span></div>`).join('') || '<div class="empty-state">暂无Benchmark</div>';
   const mem = await api(`/projects/${projectId}/memory/stats`);
   document.getElementById('project-memory-stats').innerHTML = mem.success ? `<pre>${JSON.stringify(mem, null, 2)}</pre>` : '<div class="empty-state">暂无记忆数据</div>';
   loadRequirementsTab(projectId, p);
@@ -820,7 +930,7 @@ async function loadRequirementsTab(projectId, p) {
     return;
   }
   el.innerHTML = baseline.requirements.functional.map(r => `
-    <div style="padding:10px 0;border-bottom:1px solid #272d3d;">
+    <div style="padding:10px 0;border-bottom:1px solid var(--bg-card);">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
         <div style="flex:1;">
           <span class="badge badge-${r.priority === 'P0' ? 'running' : 'completed'}">${r.id} · ${r.priority}</span>
@@ -923,19 +1033,19 @@ async function loadQuality() {
     <div class="card"><div class="label">质量门禁</div><div class="value" style="color:#22c55e;">通过</div></div>
   `;
   document.getElementById('quality-gates').innerHTML = `
-    <div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>准确率 (≥0.8)</span><span style="color:#22c55e;">0.875 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:87.5%;background:#22c55e;"></div></div></div>
-    <div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>幻觉率 (≤0.1)</span><span style="color:#22c55e;">0.062 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:62%;background:#22c55e;"></div></div></div>
-    <div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>召回率 (≥0.85)</span><span style="color:#22c55e;">0.89 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:89%;background:#22c55e;"></div></div></div>
-    <div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>格式合规 (≥0.95)</span><span style="color:#22c55e;">0.98 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:98%;background:#22c55e;"></div></div></div>
-    <div><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>安全合规 (=1.0)</span><span style="color:#22c55e;">1.0 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:100%;background:#22c55e;"></div></div></div>
+    <div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>准确率 (≥0.8)</span><span style="color:#22c55e;">0.875 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:87.5%;background:var(--ok);"></div></div></div>
+    <div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>幻觉率 (≤0.1)</span><span style="color:#22c55e;">0.062 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:62%;background:var(--ok);"></div></div></div>
+    <div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>召回率 (≥0.85)</span><span style="color:#22c55e;">0.89 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:89%;background:var(--ok);"></div></div></div>
+    <div style="margin-bottom:12px;"><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>格式合规 (≥0.95)</span><span style="color:#22c55e;">0.98 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:98%;background:var(--ok);"></div></div></div>
+    <div><div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>安全合规 (=1.0)</span><span style="color:#22c55e;">1.0 ✓</span></div><div class="progress-bar"><div class="progress-fill" style="width:100%;background:var(--ok);"></div></div></div>
   `;
   const chart = echarts.init(document.getElementById('chart-quality-radar'));
   chart.setOption({
     radar: { indicator: [
       { name: '准确率', max: 1 }, { name: '召回率', max: 1 }, { name: '格式合规', max: 1 },
       { name: '安全合规', max: 1 }, { name: '低幻觉', max: 1 }, { name: '响应速度', max: 1 }
-    ], axisName: { color: '#9aa6ba' } },
-    series: [{ type: 'radar', data: [{ value: [0.875, 0.89, 0.98, 1.0, 0.94, 0.85], name: '当前质量', areaStyle: { color: 'rgba(108,140,255,0.3)' }, lineStyle: { color: '#6c8cff' } }] }]
+    ], axisName: { color: cssVar('--tx-weak') } },
+    series: [{ type: 'radar', data: [{ value: [0.875, 0.89, 0.98, 1.0, 0.94, 0.85], name: '当前质量', areaStyle: { color: 'rgba(108,140,255,0.3)' }, lineStyle: { color: cssVar('--accent') } }] }]
   });
   charts.qualityRadar = chart;
 }
@@ -952,12 +1062,12 @@ async function loadReviewQueue() {
   document.getElementById('review-reviewed-count').textContent = reviewed.length;
   document.getElementById('review-pass-rate').textContent = reviewed.length ? (approved/reviewed.length*100).toFixed(0) + '%' : '-';
   document.getElementById('review-queue').innerHTML = pending.length ? pending.map(r => `
-    <div style="padding:16px;border:1px solid #323a4e;border-radius:8px;margin-bottom:12px;">
+    <div style="padding:16px;border:1px solid var(--bd);border-radius:8px;margin-bottom:12px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <span><span class="badge badge-pending">待审核</span> <strong>${r.type}</strong></span>
-        <span style="color:#7e8aa0;font-size:12px;">${new Date(r.created_at*1000).toLocaleString()}</span>
+        <span style="color:var(--tx-faint);font-size:12px;">${new Date(r.created_at*1000).toLocaleString()}</span>
       </div>
-      <div style="font-size:13px;color:#b6bfce;margin-bottom:12px;">项目: ${r.project_id} | 审核ID: ${r.review_id}</div>
+      <div style="font-size:13px;color:var(--tx-sub);margin-bottom:12px;">项目: ${r.project_id} | 审核ID: ${r.review_id}</div>
       <div style="display:flex;gap:8px;">
         <button class="btn btn-success btn-sm" onclick="reviewAction('${r.review_id}','approve')">✓ 通过</button>
         <button class="btn btn-danger btn-sm" onclick="reviewAction('${r.review_id}','reject')">✗ 驳回</button>
@@ -999,12 +1109,12 @@ async function loadSelfService() {
   document.getElementById('ss-fde-count').textContent = totalFdeNeeded;
   document.getElementById('ss-projects').innerHTML = ssProjects.length ? ssProjects.map(p => {
     const prog = p.ss_progress;
-    return `<div style="padding:16px;border:1px solid #323a4e;border-radius:8px;margin-bottom:12px;">
+    return `<div style="padding:16px;border:1px solid var(--bd);border-radius:8px;margin-bottom:12px;">
       <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
-        <strong>${p.name}</strong><span style="color:#6c8cff;font-size:12px;">${prog.current_step_name || '已完成'}</span>
+        <strong>${p.name}</strong><span style="color:var(--accent);font-size:12px;">${prog.current_step_name || '已完成'}</span>
       </div>
       <div class="progress-bar" style="margin-bottom:8px;"><div class="progress-fill" style="width:${prog.progress_percentage}%"></div></div>
-      <div style="display:flex;gap:16px;font-size:12px;color:#9aa6ba;">
+      <div style="display:flex;gap:16px;font-size:12px;color:var(--tx-weak);">
         <span>进度: ${prog.completed_steps}/${prog.total_steps}</span>
         <span>客户: ${p.client_name || '-'}</span>
         <span>行业: ${p.industry || '-'}</span>
@@ -1054,14 +1164,14 @@ async function loadKbPending() {
   const entries = data.entries || [];
   if (!entries.length) { box.innerHTML = '<div class="empty-state">队列为空——badcase 闭环或人工 curate 会进入这里</div>'; return; }
   box.innerHTML = entries.map(e => `
-    <div style="border:1px solid #323a4e;border-radius:8px;padding:12px;margin-bottom:10px;">
+    <div style="border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:10px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-        <b style="color:#e8ecf4;">${e.draft?.question_pattern || '(无问题模式)'}</b>
-        <span style="font-size:12px;color:#9aa6ba;">${e.draft?.origin || ''}</span>
+        <b style="color:var(--tx);">${e.draft?.question_pattern || '(无问题模式)'}</b>
+        <span style="font-size:12px;color:var(--tx-weak);">${e.draft?.origin || ''}</span>
       </div>
-      <div style="color:#b6bfce;font-size:13px;white-space:pre-wrap;max-height:120px;overflow:auto;">${(e.draft?.answer || '').slice(0, 500)}</div>
+      <div style="color:var(--tx-sub);font-size:13px;white-space:pre-wrap;max-height:120px;overflow:auto;">${(e.draft?.answer || '').slice(0, 500)}</div>
       <div style="display:flex;gap:8px;margin-top:10px;justify-content:flex-end;">
-        <button class="btn btn-sm" style="background:#ef4444;color:#fff;border:none;" onclick="kbReject('${e.entry_id}')">拒绝</button>
+        <button class="btn btn-sm" style="background:var(--bad);color:#fff;border:none;" onclick="kbReject('${e.entry_id}')">拒绝</button>
         <button class="btn btn-primary btn-sm" onclick="kbConfirm('${e.entry_id}')">确认生效</button>
       </div>
     </div>`).join('');
@@ -1079,6 +1189,21 @@ async function kbReject(entryId) {
   if (r.success !== false) { await loadKbPending(); } else alert(r.detail?.message || r.error || '拒绝失败');
 }
 
+async function kbConfirmAll() {
+  const pid = document.getElementById('kb-project').value;
+  const data = await api(`/kb/entries?project_id=${pid}&status=pending&page=1&page_size=50`);
+  const entries = data.entries || [];
+  if (!entries.length) { alert('队列为空'); return; }
+  if (!confirm(`确认本页 ${entries.length} 条？确认后加权生效且不可逆`)) return;
+  let ok = 0;
+  for (const e of entries) {
+    const r = await api(`/kb/entries/${e.entry_id}/confirm?project_id=${pid}`, { method: 'POST' });
+    if (r.success !== false) ok++;
+  }
+  alert(`已确认 ${ok}/${entries.length}`);
+  await loadKbPending(); await loadKnowledge();
+}
+
 async function kbSearch() {
   const pid = document.getElementById('kb-project').value;
   const q = document.getElementById('kb-query').value.trim();
@@ -1089,12 +1214,12 @@ async function kbSearch() {
   const hits = data.hits || [];
   if (!hits.length) { box.innerHTML = '<div class="empty-state">无命中（空结果也是契约行为：精确口径）</div>'; return; }
   box.innerHTML = hits.map(h => `
-    <div style="border:1px solid #323a4e;border-radius:8px;padding:12px;margin-bottom:10px;">
+    <div style="border:1px solid var(--bd);border-radius:8px;padding:12px;margin-bottom:10px;">
       <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-        <span style="color:#6c8cff;font-size:12px;">📄 ${h.source?.filename || '?'} · 片段${h.source?.chunk_index ?? '?'} · [${h.source?.start_at ?? '?'}~${h.source?.end_at ?? '?'}]</span>
-        <span style="font-size:12px;color:#9aa6ba;">${h.entry_type} · ${h.score.toFixed(2)}</span>
+        <span style="color:var(--accent);font-size:12px;">📄 ${h.source?.filename || '?'} · 片段${h.source?.chunk_index ?? '?'} · [${h.source?.start_at ?? '?'}~${h.source?.end_at ?? '?'}]</span>
+        <span style="font-size:12px;color:var(--tx-weak);">${h.entry_type} · ${h.score.toFixed(2)}</span>
       </div>
-      <div style="color:#ccd4e0;font-size:13px;">${h.content.slice(0, 300)}</div>
+      <div style="color:var(--tx-sub);font-size:13px;">${h.content.slice(0, 300)}</div>
     </div>`).join('');
 }
 
@@ -1128,11 +1253,11 @@ async function renderOntoMermaid(pid) {
     const text = await res.text();
     if (!text.trim().startsWith('graph')) { box.innerHTML = '<div class="empty-state">先执行抽取</div>'; return; }
     if (window.mermaid) {
-      mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+      mermaid.initialize({ startOnLoad: false, theme: document.documentElement.getAttribute('data-theme') === 'light' ? 'default' : 'dark' });
       const { svg } = await mermaid.render('onto-svg-' + Date.now(), text);
       box.innerHTML = svg;
     } else {
-      box.innerHTML = `<pre style="color:#9aa;font-size:12px;white-space:pre;">${text.replace(/</g, '&lt;')}</pre><div style="color:#7e8aa0;font-size:12px;">（离线模式：显示 Mermaid 源码，联网后自动渲染图形）</div>`;
+      box.innerHTML = `<pre style="color:#9aa;font-size:12px;white-space:pre;">${text.replace(/</g, '&lt;')}</pre><div style="color:var(--tx-faint);font-size:12px;">（离线模式：显示 Mermaid 源码，联网后自动渲染图形）</div>`;
     }
   } catch (e) { box.innerHTML = `<div class="empty-state">渲染失败：${e.message}</div>`; }
 }
@@ -1158,10 +1283,10 @@ async function ontoSearch() {
   const ents = data.entities || [];
   if (!ents.length) { box.innerHTML = '<div class="empty-state">无匹配实体</div>'; return; }
   box.innerHTML = ents.map(e => `
-    <div style="display:flex;justify-content:space-between;align-items:center;border:1px solid #323a4e;border-radius:8px;padding:10px;margin-bottom:8px;">
-      <div><b style="color:#e8ecf4;">${e.name}</b> <span style="color:#6c8cff;font-size:12px;">${e.type}</span>
+    <div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--bd);border-radius:8px;padding:10px;margin-bottom:8px;">
+      <div><b style="color:var(--tx);">${e.name}</b> <span style="color:var(--accent);font-size:12px;">${e.type}</span>
         <div style="color:#777;font-size:11px;">置信度 ${e.confidence} · 来源 ${(e.source_docs || []).join(', ')}</div></div>
-      <button class="btn btn-sm" style="background:#ef4444;color:#fff;border:none;" onclick="ontoDeleteEntity('${e.id}')">删除</button>
+      <button class="btn btn-sm" style="background:var(--bad);color:#fff;border:none;" onclick="ontoDeleteEntity('${e.id}')">删除</button>
     </div>`).join('');
 }
 

@@ -45,3 +45,12 @@ class TestDashboardV04:
 
     def test_version_bumped(self, client):
         assert "v0.4.0" in client.get("/dashboard").text
+
+    def test_v05_ui_elements(self, client):
+        """v0.5 界面：主题系统/八步价值流/批量确认/邀请卡。"""
+        html = client.get("/dashboard").text
+        for token in ('data-theme="dark"', 'data-theme="light"', "toggleTheme",
+                      "VF_STEPS", "value-flow", "八步价值流", "renderValueFlow"):
+            assert token in html, f"缺 v0.5 元素: {token}"
+        assert "kbConfirmAll" in html, "缺批量确认"
+        assert "genInvite" in html, "缺邀请码生成"
