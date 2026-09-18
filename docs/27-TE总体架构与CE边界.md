@@ -57,7 +57,7 @@
 | User/ProjectMember 表（SQLite）+ 项目角色矩阵 + client_viewer 只读白名单（OpenAPI 自动生成+契约测试） | 订阅/计量/账单（Token Gateway 计费数据对接） |
 | 本地登录页与成员管理（本地多用户档） | 白标/审计合规（EE）/大容量层（EE） |
 | nf 文件级导出 + RPA webhook 三端点 + 机器 token（**冻结面**） | nf/RPA 完整集成（回调/多租户路由/计量/流水线） |
-| 全部 v0.4 既有能力原样 | 共享资产运营（团队 KB 发布流/经验库贡献审核） |
+| 全部 v0.4 既有能力原样（知识库=**Embedded 内置唯一推荐**） | 共享资产运营（团队 KB 发布流/经验库贡献审核）；**TE 默认接平台 kb-os 池** |
 
 **判定规则**（后续新增特性的裁决依据）：*该能力是否要求"单机用户不部署任何外部系统就能用"？*
 是 → CE（且不得因商业版阉割）；否（需要 CASDoor/TokenGateway/org 概念）→ ee 层经替换点或契约面接入。
@@ -80,7 +80,7 @@ EE（专属部署）       ：同 TE 替换件；CASDoor 可联邦企业 IdP（�
 | --- | --- | --- | --- |
 | **CASDoor** | 统一认证（登录/MFA/用户目录/Org） | 不对接（CE 用本地用户管理） | CasdoorAuthProvider 整块替换（标准 OIDC，不绑定实现） |
 | **Token Gateway** | LLM 代理 × token 计费 | 纯配置（`LOCAL_MODEL_BASE_URL` 指过去，OpenAI 兼容）；BYOK 直连不经网关 | 同配置路径 + 计费数据对接（gateway 侧出账）；nf 编码消耗也经此计量 |
-| **kb-os** | 知识库模块（契约 14 v1.2） | Embedded 默认 / `KNOWLEDGE_SERVICE_URL` 可选（Fallback 降级） | 平台 kb-os 项目池（`te-{org}-*` 命名域 + key 池编排） |
+| **kb-os** | 知识库模块（契约 14 v1.2） | **Embedded 内置（CE 唯一推荐形态）**；远程对接配置面保留但属 TE/EE 场景 | **平台 kb-os 项目池为 TE 默认**（`te-{org}-*` 命名域 + key 池编排） |
 | **本体服务** | 本体模块（契约 20 v0.1） | Embedded 默认 / URL 可选 | 平台本体服务 + 团队共享域 |
 | **night-factory** | 夜间无人值守编码 | 文件级导出（冻结） | API 派发+状态回调+org 仓库池 |
 | **RPA** | 自动化测试执行 | webhook 三端点+机器 token（冻结） | 回调回推+org 路由+执行计量 |
@@ -120,6 +120,7 @@ EE（专属部署）       ：同 TE 替换件；CASDoor 可联邦企业 IdP（�
 | D1 | 多租户/OIDC=TE 特性，不进 CE；CE=AuthProvider 抽象+本地用户管理 | 09-18 | 25 号 v1.1 |
 | D2 | 认证=CASDoor（统一认证中心）；LLM 代理计费=Token Gateway | 09-18 | 25/24 号 |
 | D3 | nf/RPA 双版本特性：CE 精简面冻结 × TE 完整面 | 09-18 | 26 号 |
+| D4 | **知识库形态分轨**：CE=Embedded 内置唯一推荐（外部对接不进主线叙事）；TE=默认平台 kb-os 池 | 09-18 | 24/27 号 |
 
 ## 10. 变更记录
 
