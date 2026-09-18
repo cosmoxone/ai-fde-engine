@@ -398,7 +398,7 @@ document.getElementById('code').placeholder = ADMIN_PENDING ? '管理员激活�
 async function go(){
   const b={name:v('name'),password:v('password'),invite_code:v('code')};
   let r=await fetch('/api/v1/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});
-  if(r.status===403 && b.invite_code){ r=await fetch('/api/v1/auth/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});}
+  if((r.status===401||r.status===403) && b.invite_code){ r=await fetch('/api/v1/auth/activate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)});}
   const j=await r.json();
   if(r.ok){location.href='/dashboard';}else{alert(j.detail||'失败');}
 }

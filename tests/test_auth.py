@@ -138,6 +138,8 @@ class TestLocalMultiUser:
             # P-5 回归：JS 不得残留 format 转义双大括号（浏览器 SyntaxError，登录按钮失效）
             assert "function go(){" in html
             assert "function v(id){" in html
+            # 首登分支回归：login 对未注册用户返回 401（非 403），前端据此转 activate
+            assert "(r.status===401||r.status===403)" in html
 
 
 class TestAdminUserManagement:
