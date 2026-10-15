@@ -134,6 +134,7 @@ _PUBLIC_EXACT = frozenset(
         "/api/v1/auth/login",
         "/api/v1/auth/activate",
         "/api/v1/auth/logout",
+        "/api/v1/auth/oidc/callback",  # OIDC 回调必须公开（CSRF 由 state cookie+换码校验承担；TE casdoor 形态）
     }
 )
 _PUBLIC_PREFIXES = ("/static/",)
@@ -145,6 +146,20 @@ async def auth_guard(request: Request):
         return
     get_auth_provider().current_user(request)  # 单用户档恒 local-admin；多用户档未登录抛 401
     return
+
+
+def visible_project_ids(user) -> set | None:
+    """用户可见项目 id 集（M2 批次 0，25 号 §4 延伸）。
+
+    - 单用户档/admin：None=不限制（v0.4 行为零变化）
+    - member：project_roles ∪ owner_user_id 归属（与 list_projects 同源语义，供全局枚举端点复用）
+    """
+    provider = get_auth_provider()
+    if not provider.users_enabled or user.is_admin:
+        return None
+    ids = set(user.project_roles.keys())
+    owned = {p["id"] for p in get_storage().list_projects() if p.get("owner_user_id") == user.id}
+    return ids | owned
 
 
 async def project_guard(request: Request):
@@ -207,6 +222,7 @@ class ProjectCreate(BaseModel):
     client_name: Optional[str] = ""
     industry: Optional[str] = ""
     description: Optional[str] = ""
+    org_id: Optional[str] = ""  # M2-1.2：ee 透传租户锚点（CE 只存不解释；单用户档无感）
 
 
 class ResearchRun(BaseModel):
@@ -409,6 +425,7 @@ async def health_check():
     return {
         "status": "healthy",
         "version": "0.4.0",
+        "build_commit": _build_commit(),
         "app_name": settings.app_name,
         "env": settings.app_env,
         "active_projects": len(get_storage().list_projects()),
@@ -423,6 +440,23 @@ async def health_check():
 
 
 # ===== 项目管理 =====
+
+
+def _build_commit() -> str:
+    """构建标识：env BUILD_COMMIT（镜像注入）→ git 探测（源码运行）→ dev。"""
+    import os as _os
+    import subprocess as _sp
+
+    env = _os.environ.get("BUILD_COMMIT", "").strip()
+    if env:
+        return env
+    try:
+        return _sp.run(["git", "rev-parse", "--short", "HEAD"], capture_output=True,
+                       text=True, timeout=3, cwd=_os.path.dirname(__file__) or ".").stdout.strip() or "dev"
+    except Exception:  # noqa: BLE001
+        return "dev"
+
+
 @app.post("/api/v1/projects")
 async def create_project(req: ProjectCreate, request: Request):
     """创建项目（多用户档：owner 归属创建者；member 创建者自动成为 project_owner——否则自己都看不到）"""
@@ -443,6 +477,8 @@ async def create_project(req: ProjectCreate, request: Request):
         project["owner_user_id"] = user.id
         if not user.is_admin:
             provider.assign_member(project_id, user.id, "project_owner")
+        org = str(getattr(user, "org_id", "") or "").strip()
+        project["org_id"] = (req.org_id or "").strip() or org  # ee 透传优先，其次用户 org
     get_storage().create_project(project)
     # 初始化记忆
     memory = get_memory_manager(project_id)
@@ -1001,7 +1037,7 @@ async def add_badcase(project_id: str, req: BadcaseFeedback):
 
 
 @app.get("/api/v1/memory/global/search")
-async def global_memory_search(query: str, limit: int = 20):
+async def global_memory_search(query: str, limit: int = 20, request: Request = None):
     """
     跨项目全局记忆检索（v0.2.0 D1 本地经验库）
     汇总全部项目记忆，按相关性与重要性排序——「这个客户类似问题以前怎么解决的？」
@@ -1011,7 +1047,10 @@ async def global_memory_search(query: str, limit: int = 20):
     storage = get_storage()
     results = []
     per_project = max(3, limit // 4)  # 每项目先取少量，合并后截断
+    allowed = visible_project_ids(get_auth_provider().current_user(request)) if request else None  # M2-0.2 多用户档隔离
     for project in storage.list_projects():
+        if allowed is not None and project["id"] not in allowed:
+            continue
         memory = get_memory_manager(project["id"])
         items = await memory.recall(query, limit=per_project)
         for m in items:
@@ -1501,15 +1540,18 @@ async def log_communication(project_id: str, req: dict):
 
 
 @app.get("/api/v1/self-service/review/pending")
-async def list_pending_reviews():
-    """获取待审核列表（FDE后台）"""
+async def list_pending_reviews(request: Request):
+    """获取待审核列表（FDE后台；M2-0.2：多用户档按可见项目集过滤）"""
     pending = get_storage().list_reviews(status="pending")
+    allowed = visible_project_ids(get_auth_provider().current_user(request))
+    if allowed is not None:
+        pending = [r for r in pending if r.get("project_id") in allowed]
     return {"success": True, "pending_count": len(pending), "reviews": pending}
 
 
 @app.post("/api/v1/self-service/review/{review_id}/action")
-async def review_action(review_id: str, req: ReviewActionRequest):
-    """审核操作（通过/驳回）"""
+async def review_action(review_id: str, req: ReviewActionRequest, request: Request):
+    """审核操作（通过/驳回；M2-0.3 归属校验）"""
     fields = {
         "status": "approved" if req.action == "approve" else "rejected",
         "comment": req.comment,
@@ -1518,13 +1560,20 @@ async def review_action(review_id: str, req: ReviewActionRequest):
     review = get_storage().update_review(review_id, fields)
     if review is None:
         raise HTTPException(status_code=404, detail="审核项不存在")
+    allowed = visible_project_ids(get_auth_provider().current_user(request))  # M2-0.3 归属校验
+    if allowed is not None and review.get("project_id") not in allowed:
+        raise HTTPException(status_code=403, detail=f"无项目 {review.get('project_id')} 的审核权限")
     return {"success": True, "review": review}
 
 
 @app.get("/api/v1/self-service/review/history")
-async def list_review_history():
-    """获取审核历史"""
-    return {"success": True, "reviews": get_storage().list_reviews()}
+async def list_review_history(request: Request):
+    """获取审核历史（M2-0.2：多用户档按可见项目集过滤）"""
+    reviews = get_storage().list_reviews()
+    allowed = visible_project_ids(get_auth_provider().current_user(request))
+    if allowed is not None:
+        reviews = [r for r in reviews if r.get("project_id") in allowed]
+    return {"success": True, "reviews": reviews}
 
 
 # ===== F8 FDE培训成长模块 =====

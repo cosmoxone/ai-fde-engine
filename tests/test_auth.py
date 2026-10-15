@@ -473,3 +473,60 @@ with TestClient(app) as c:
     assert c.get("/api/v1/projects/p1", headers={"X-User": "alice"}).status_code == 404
 print("ASSEMBLY-OK")
 """
+
+
+class TestGlobalEnumerationIsolation:
+    """M2 批次 0（plan-m2-org-tenancy §1-0）：全局枚举端点隔离——review pending/history
+    按可见项目集过滤、review_action 归属校验、单用户档零变化（两用户跨项目互不可见）。"""
+
+    def _team_with_review(self, provider):
+        """boss(admin) + bob(member，自有项目+一条审核项)。返回 bob 项目的 review_id。"""
+        with _authd_client(provider) as c:
+            c.post("/api/v1/auth/activate", json={"name": "boss", "password": "pass-12345", "invite_code": "ADMIN-CODE-1"})
+            invite = c.post("/api/v1/auth/invites").json()["invite_code"]
+        provider._conn.execute(
+            "INSERT INTO local_users(id,name,pass_hash,platform_role) VALUES('u-bob','bob',?,'member')",
+            (hash_password("bob-12345"),),
+        )
+        provider._conn.commit()
+        with _authd_client(provider) as c:  # bob 建项目（owner 自动 project_owner）
+            c.post("/api/v1/auth/login", json={"name": "bob", "password": "bob-12345"})
+            pid = c.post("/api/v1/projects", json={"name": "Bob 项目", "client_name": "ACME"}).json()["project"]["id"]
+        from src.config import get_settings
+        from src.storage import get_storage
+
+        get_storage().add_review({"review_id": "rev-bob-1", "project_id": pid, "status": "pending", "kind": "benchmark", "data": {"x": 1}})
+        return pid, invite
+
+    def test_review_pending_history_isolated(self, tmp_path):
+        provider = LocalAuthProvider(users_enabled=True, data_dir=str(tmp_path), admin_invite_code="ADMIN-CODE-1")
+        pid, invite = self._team_with_review(provider)
+        with _authd_client(provider) as c:  # boss 第二邀请 → carol（无任何项目）
+            c.post("/api/v1/auth/login", json={"name": "boss", "password": "pass-12345"})
+            invite2 = c.post("/api/v1/auth/invites").json()["invite_code"]
+        with _authd_client(provider) as c:  # carol 激活
+            c.post("/api/v1/auth/activate", json={"name": "carol", "password": "carol-12345", "invite_code": invite2})
+            pending = c.get("/api/v1/self-service/review/pending").json()
+            assert pending["pending_count"] == 0  # 跨项目审核不可见
+            history = c.get("/api/v1/self-service/review/history").json()
+            assert history["reviews"] == []
+        with _authd_client(provider) as c:  # bob（项目 owner）可见
+            c.post("/api/v1/auth/login", json={"name": "bob", "password": "bob-12345"})
+            pending = c.get("/api/v1/self-service/review/pending").json()
+            assert pending["pending_count"] == 1 and pending["reviews"][0]["project_id"] == pid
+            rid = pending["reviews"][0]["review_id"]
+        with _authd_client(provider) as c:  # carol 对该审核项 action → 403（归属校验）
+            c.post("/api/v1/auth/login", json={"name": "carol", "password": "carol-12345"})
+            r = c.post(f"/api/v1/self-service/review/{rid}/action", json={"action": "approve", "comment": "x"})
+            assert r.status_code == 403
+
+    def test_single_user_mode_unchanged(self, tmp_path):
+        """红线：单用户档零变化——pending/history 全量返回，action 无归属拦截。"""
+        from src.storage import get_storage
+
+        get_storage().add_review({"review_id": "rev-single-1", "project_id": "any", "status": "pending", "kind": "benchmark", "data": {}})
+        with _authd_client(LocalAuthProvider(users_enabled=False, data_dir=str(tmp_path))) as c:
+            assert c.get("/api/v1/self-service/review/pending").json()["pending_count"] == 1
+            rid = c.get("/api/v1/self-service/review/pending").json()["reviews"][0]["review_id"]
+            r = c.post(f"/api/v1/self-service/review/{rid}/action", json={"action": "approve", "comment": "x"})
+            assert r.status_code == 200

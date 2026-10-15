@@ -44,7 +44,9 @@ class TestDashboardV04:
         assert "window.mermaid" in html and "离线模式" in html, "应有降级渲染分支"
 
     def test_version_bumped(self, client):
-        assert "v0.4.0" in client.get("/dashboard").text
+        # v0.5：版本徽标动态化（CE/TE+build_commit 由 JS 运行时注入，见 initEditionBadge）
+        html = client.get("/dashboard").text
+        assert "edition-badge" in html and "交付控制台" in html
 
     def test_v05_ui_elements(self, client):
         """v0.5 界面：主题系统/八步价值流/批量确认/邀请卡。"""

@@ -113,7 +113,7 @@ pre { background: var(--bg-page); border: 1px solid var(--bd); border-radius: 6p
 <body>
 
 <div class="sidebar">
-  <div class="logo">AI-FDE Engine<span>v0.4.0 · 交付控制台</span></div>
+  <div class="logo">AI-FDE Engine<span id="edition-badge">交付控制台</span> <span id="te-ops" style="display:none;margin-left:8px;"><a href="/api/te/pages/members" style="color:#7dd3fc;font-size:11px;">TE 运营面 ⚙</a></span></div>
   <div class="nav-item active" data-page="overview"><span class="icon">📊</span><span>总览</span></div>
   <div class="nav-item" data-page="projects"><span class="icon">📁</span><span>项目管理</span></div>
   <div class="nav-item" data-page="tasks"><span class="icon">⚡</span><span>任务监控</span></div>
@@ -708,7 +708,7 @@ async function loadUserBox() {
   const box = document.getElementById('user-box');
   try {
     const r = await fetch(API + '/auth/me');
-    if (!r.ok) { box.innerHTML = ''; return; }
+    if (!r.ok) { box.innerHTML = ''; location.href = '/api/v1/auth/login'; return; }  // 未认证→登录（TE: 307 CASDoor；CE 多用户: 登录页）
     const j = await r.json();
     if (j.user && j.user.id !== 'local-admin') {
       box.innerHTML = `<div>👤 ${j.user.display_name}（${j.user.platform_role}）</div>
@@ -729,6 +729,20 @@ async function doLogout() {
   location.href = '/api/v1/auth/login';
 }
 loadUserBox();
+(async function initEditionBadge() {  // 版本/形态/构建标识（CE 与 TE 同一 Dashboard，徽标区分）
+  try {
+    const h = await (await fetch(API + '/health')).json();
+    let badge = `CE v${h.version || '?'} · ${h.build_commit || 'dev'}`;
+    try {
+      const t = await (await fetch('/api/te/info')).json();
+      if (t && t.edition === 'te') {
+        badge = `TE ${t.version} · ${t.build_commit || h.build_commit || 'dev'}`;
+        document.getElementById('te-ops').style.display = '';
+      }
+    } catch (e) { /* CE：无 te 端点 */ }
+    document.getElementById('edition-badge').textContent = badge + ' · 交付控制台';
+  } catch (e) { document.getElementById('edition-badge').textContent = '交付控制台'; }
+})();
 
 // ===== 成员管理（v0.5 二阶段：admin 专用）=====
 let _membersProjects = [];
