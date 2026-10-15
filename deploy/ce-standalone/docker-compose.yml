@@ -1,0 +1,32 @@
+# CE 本地多用户部署（单容器，零外部依赖）
+# 用法：cp .env.example .env && docker compose up -d --build
+services:
+  aifde-ce:
+    build:
+      context: ../..
+      dockerfile: deploy/Dockerfile
+      args:
+        REQUIREMENTS: requirements-core.txt   # 轻量形态（Mock 模式开箱即用）；全量组件改 requirements.txt
+    container_name: aifde-ce
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - BUILD_COMMIT=${BUILD_COMMIT:-local-build}
+      - LOCAL_USERS_ENABLED=true          # v0.5 本地多用户档（邀请码/角色矩阵）
+      - ADMIN_INVITE_CODE=${ADMIN_INVITE_CODE:?请在 .env 设置首个管理员激活码}
+      - DATA_DIR=/data                    # 全部状态入卷
+      - KNOWLEDGE_SERVICE_URL=            # 空=Embedded 知识库（契约 14 参考实现）
+      - ONTOLOGY_SERVICE_URL=             # 空=Embedded 本体（契约 20 参考实现）
+      - STORAGE_PROVIDER=sqlite
+    volumes:
+      - aifde-ce-data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  aifde-ce-data:

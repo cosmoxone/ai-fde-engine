@@ -1,0 +1,12 @@
+.venv/
+.git/
+data/
+data_*/
+ee/
+docs/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+node_modules/
+*.md

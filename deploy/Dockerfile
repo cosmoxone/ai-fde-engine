@@ -62,6 +62,10 @@ RUN groupadd --gid 1000 appuser && \
     chown -R appuser:appuser /app /tmp/aifde-docs /tmp/aifde-memory /tmp/openhands-workspaces
 
 # 切换到非root用户
+# 数据目录（具名卷首挂继承属主；DATA_DIR 缺省 /data）
+RUN mkdir -p /data && chown appuser:appuser /data
+ENV DATA_DIR=/data
+VOLUME ["/data"]
 USER appuser
 
 # 环境变量
