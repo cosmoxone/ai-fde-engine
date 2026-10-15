@@ -7,6 +7,7 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
+from src import __version__
 from src.main import app
 
 
@@ -40,7 +41,7 @@ class TestHealthAPI:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
-        assert data["version"] == "0.4.0"
+        assert data["version"] == __version__
         assert "services" in data
 
 

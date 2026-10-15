@@ -24,6 +24,24 @@
 
 - `get_auth_provider()` 装配优先级：注入 > 环境注册名 > local > 未注册名回落（回落行为与 v0.5 一致，新增 stderr 提示）
 
+## [0.5.0] - 2026-10-15 冲刺入库收口（M1-M3 × 平台协作 × 两形态部署 × OIDC 收尾）
+
+> 本版无独立发布窗口：成果于 09-18→09-23 冲刺完成、10-14 审计确认零回归（637 passed, 10 skipped），
+> 10-15 随 36 号复盘建议 A 分组提交合入主干。过程全录：docs/34-36。
+
+### Added
+
+- M2 组织协作：全局枚举隔离（4 处泄漏修复）+ org 透传；M3 共享资产（kb_runtime remote/embedded 双模式、发布流、审核队列、经验库、降级）
+- OIDC 收尾：`/api/v1/auth/oidc/callback` 进守卫白名单 + casdoor provider 补 `/auth/me`（35 号 L1/L3 修复）
+- CE 本地多用户单容器部署物 `deploy/ce-standalone/`（数据卷属主修复）；环境分级矩阵 `envs/`（五环境 × 双形态 + run.sh）；幂等演示数据 `demo/seed.py`
+- Dashboard 双形态徽标（health + `/api/te/info` 双探测，含 build_commit）+ 未认证自动跳登录
+
+### Changed
+
+- health 与 FastAPI `version` 改读 `src/__init__.py` 的 `__version__` 单一源（0.3.0 → 0.5.0；36 号建议 D）
+- README/文档导读测试数口径统一为实跑数 637（36 号建议 D）
+- `.gitignore` 增补运行态产物（`data_*/`、`envs/run/`），防会话密钥误提交（36 号建议 C）
+
 ## [0.4.0] - 2026-09-17 知识与本体（v0.4-a 契约接入 × v0.4-b 本体抽取 × v0.4-c Research RAG 化）
 
 > **发布概要**：测试 488→549 全绿（含契约套件 13 用例）；契约 14 号 v1.2 定版并双实现（Embedded × kb-os 真机）对拍一致；

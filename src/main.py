@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse, PlainTextResponse, RedirectResponse,
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from . import __version__
 from .agents.delivery import DeliveryAgent
 from .agents.design import DesignAgent
 from .agents.research import ResearchAgent
@@ -180,7 +181,7 @@ async def project_guard(request: Request):
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.4.0",
+    version=__version__,
     description="AI驱动的FDE交付引擎 - 调研、设计、开发、迭代全流程AI化",
     lifespan=lifespan,
     dependencies=[Depends(auth_guard), Depends(project_guard)],
@@ -424,7 +425,7 @@ async def health_check():
     """健康检查"""
     return {
         "status": "healthy",
-        "version": "0.4.0",
+        "version": __version__,
         "build_commit": _build_commit(),
         "app_name": settings.app_name,
         "env": settings.app_env,
