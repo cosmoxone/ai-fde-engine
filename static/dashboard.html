@@ -27,6 +27,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .nav-item.active { background: var(--bg-hover); color: var(--accent); border-left-color: var(--accent); }
 .nav-item .icon { width: 18px; text-align: center; }
 .main { margin-left: 220px; flex: 1; padding: 24px 32px; }
+/* 嵌入模式（TE 壳 iframe，?embed=1）：导航职责上移至外层壳——隐藏本页侧栏，内容全宽 */
+body.embed .sidebar { display: none !important; }
+body.embed .main { margin-left: 0 !important; }
+body.embed #te-ops { display: none !important; }
 .page { display: none; }
 .page.active { display: block; }
 .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
@@ -111,6 +115,7 @@ pre { background: var(--bg-page); border: 1px solid var(--bd); border-radius: 6p
 <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" onerror="window.mermaid=null"></script>
 </head>
 <body>
+<script>if(new URLSearchParams(location.search).get('embed')==='1')document.body.classList.add('embed');</script>
 
 <div class="sidebar">
   <div class="logo">AI-FDE Engine<span id="edition-badge">交付控制台</span> <span id="te-ops" style="display:none;margin-left:8px;"><a href="/api/te/pages/members" style="color:#7dd3fc;font-size:11px;">TE 运营面 ⚙</a></span></div>
