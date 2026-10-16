@@ -136,6 +136,7 @@ _PUBLIC_EXACT = frozenset(
         "/api/v1/auth/activate",
         "/api/v1/auth/logout",
         "/api/v1/auth/oidc/callback",  # OIDC 回调必须公开（CSRF 由 state cookie+换码校验承担；TE casdoor 形态）
+        "/api/te/info",  # TE 形态探测（edition/provider 徽标+登录页形态识别；无敏感数据，design-te-web-v1 §2）
     }
 )
 _PUBLIC_PREFIXES = ("/static/",)
