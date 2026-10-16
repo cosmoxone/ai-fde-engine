@@ -11,6 +11,7 @@
 
 ### Added
 
+- `/api/te/info` 加入公开白名单（TE 形态探测端点：登录页 local/casdoor 形态识别与徽标依赖；仅返回 edition/provider 等非敏感字段——design-te-web-v1 §2）
 - `src/auth` 替换 provider 注册表：`register_auth_provider(name, factory)` / `get_provider_factory(name)` /
   `registered_providers()`——商业包装配时注册（如 ee 层 casdoor），内核仅见协议、零感知实现
 - `set_auth_provider(provider)`：装配期显式注入单例（TE 入口/测试用；优先级高于 AUTH_PROVIDER 环境装配）
